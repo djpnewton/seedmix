@@ -1,0 +1,22 @@
+# Dependencies
+external/
+
+# Build artifacts
+build/
+sdkconfig
+sdkconfig.old
+*.o
+*.a
+*.elf
+*.bin
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

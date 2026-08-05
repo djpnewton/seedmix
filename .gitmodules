@@ -1,0 +1,8 @@
+[submodule "external/lvgl"]
+	path = external/lvgl
+	url = https://github.com/lvgl/lvgl.git
+	branch = v9.2.0
+[submodule "external/libwally-core"]
+	path = external/libwally-core
+	url = https://github.com/ElementsProject/libwally-core.git
+	branch = release_1.5.6
