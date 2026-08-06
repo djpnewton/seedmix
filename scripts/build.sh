@@ -62,7 +62,13 @@ fi
 
 # -- Configure & Build ------------------------------------------------
 BUILD_TYPE="${1:-Debug}"
-BUILD_TYPE="${BUILD_TYPE^}"   # Capitalize first letter
+ASAN_FLAG=""
+if [ "$BUILD_TYPE" = "asan" ]; then
+    BUILD_TYPE="Debug"
+    ASAN_FLAG="-DENABLE_ASAN=ON"
+    echo "AddressSanitizer enabled"
+fi
+BUILD_TYPE="${BUILD_TYPE^}"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
@@ -70,7 +76,8 @@ cd "$BUILD_DIR"
 echo "Configuring (${BUILD_TYPE})…"
 cmake "$PROJECT_ROOT" \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-    -DLVGL_DIR="${PROJECT_ROOT}/external/lvgl"
+    -DLVGL_DIR="${PROJECT_ROOT}/external/lvgl" \
+    $ASAN_FLAG
 
 echo "Building…"
 cmake --build . -- -j"$(nproc)"
