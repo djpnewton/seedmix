@@ -18,6 +18,7 @@ set(COMMON_SOURCES
     main/main.c
     main/ui/ui.c
     main/ui/word_entry.c
+    main/ui/mnemonic_view.c
     main/ui/log.c
     main/crypto/mnemonic.c
     main/crypto/secure_stack.c

@@ -4,6 +4,7 @@
  */
 
 #include "ui.h"
+#include "mnemonic_view.h"
 #include "util/error.h"
 #include <string.h>
 
@@ -220,16 +221,24 @@ void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok) {
         lv_obj_align(w, LV_ALIGN_TOP_MID, 0, 55);
     }
 
-    lv_obj_t* l = lv_label_create(s);
-    lv_label_set_text(l, words);
-    lv_obj_set_style_text_color(l, lv_color_white(), 0);
-    lv_obj_set_style_text_font(l, &lv_font_montserrat_20, 0);
-    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(l, 440);
-    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    lv_obj_align(l, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_t* grid = ui_mnemonic_view_create(s);
+    lv_obj_align(grid, LV_ALIGN_TOP_MID, 0, show_warning ? 85 : 55);
+    ui_mnemonic_view_set_words(grid, words);
+    lv_obj_update_layout(grid);
 
-    add_btn(s, "Ok", on_ok, type == MNEMONIC_TYPE_FINAL ? 130 : 80);
+    lv_obj_t* ok = lv_button_create(s);
+    lv_obj_set_size(ok, 160, 50);
+    lv_obj_align_to(ok, grid, LV_ALIGN_OUT_BOTTOM_MID, 0, 12);
+    union {
+        ui_cb_t fn;
+        void*   vp;
+    } u = {.fn = on_ok};
+    lv_obj_add_event_cb(ok, ui_btn_invoke, LV_EVENT_CLICKED, u.vp);
+    lv_obj_t* ol = lv_label_create(ok);
+    lv_label_set_text(ol, "Ok");
+    lv_obj_set_style_text_font(ol, &lv_font_montserrat_24, 0);
+    lv_obj_center(ol);
+
     ui_swap_screen(s);
 }
 
