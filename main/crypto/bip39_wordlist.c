@@ -10,7 +10,7 @@
 #include <wally_bip39.h>
 
 static const char* wordlist[BIP39_WORD_COUNT];
-static bool       loaded = false;
+static bool        loaded = false;
 
 void bip39_wordlist_init(void) {
     if (loaded) return;
@@ -26,15 +26,14 @@ void bip39_wordlist_init(void) {
 static bool prefix_match(const char* word, const char* prefix, size_t plen) {
     if (plen == 0) return false;
     for (size_t i = 0; i < plen; i++) {
-        if (tolower((unsigned char)word[i]) != tolower((unsigned char)prefix[i]))
-            return false;
+        if (tolower((unsigned char)word[i]) != tolower((unsigned char)prefix[i])) return false;
     }
     return true;
 }
 
 size_t bip39_wordlist_lookup(const char* prefix, const char** matches) {
     if (!prefix || !*prefix) return 0;
-    size_t plen = strlen(prefix);
+    size_t plen  = strlen(prefix);
     size_t count = 0;
     for (size_t i = 0; i < BIP39_WORD_COUNT; i++) {
         if (prefix_match(wordlist[i], prefix, plen)) {

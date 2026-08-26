@@ -4,25 +4,23 @@
  *        runs the shared application main loop.
  */
 
-#include "lvgl.h"
-#include "lv_sdl_window.h"
-#include "lv_sdl_mouse.h"
-#include "lv_sdl_keyboard.h"
-#include "lv_sdl_mousewheel.h"
 #include "app.h"
+#include "lv_sdl_keyboard.h"
+#include "lv_sdl_mouse.h"
+#include "lv_sdl_mousewheel.h"
+#include "lv_sdl_window.h"
+#include "lvgl.h"
 #include <SDL2/SDL.h>
 
 /* -- Display configuration -------------------------------------------- */
-#define DISPLAY_WIDTH   480
-#define DISPLAY_HEIGHT  320
+#define DISPLAY_WIDTH 480
+#define DISPLAY_HEIGHT 320
 
 /* -- SDL tick callback ------------------------------------------------ */
-static uint32_t sdl_tick_cb(void) {
-    return SDL_GetTicks();
-}
+static uint32_t sdl_tick_cb(void) { return SDL_GetTicks(); }
 
 /* -- Entry point ------------------------------------------------------ */
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
@@ -32,7 +30,7 @@ int main(int argc, char **argv) {
     lv_tick_set_cb(sdl_tick_cb);
 
     /* Create SDL window + display (LVGL v9 built-in) */
-    lv_display_t *disp = lv_sdl_window_create(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+    lv_display_t* disp = lv_sdl_window_create(DISPLAY_WIDTH, DISPLAY_HEIGHT);
     lv_sdl_window_set_title(disp, "Entropy");
 
     /* Register input devices */

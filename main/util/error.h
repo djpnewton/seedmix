@@ -30,9 +30,12 @@ void fatal_handler(const char* file, int line, const char* fmt, ...);
 /**
  * @brief If `expr` is false (0), call FATAL with the given format string.
  */
-#define ASSERT_OR_DIE(expr, fmt, ...) do { \
-    if (!(expr)) { FATAL(fmt, ##__VA_ARGS__); } \
-} while(0)
+#define ASSERT_OR_DIE(expr, fmt, ...)                                                              \
+    do {                                                                                           \
+        if (!(expr)) {                                                                             \
+            FATAL(fmt, ##__VA_ARGS__);                                                             \
+        }                                                                                          \
+    } while (0)
 
 #ifdef __cplusplus
 }

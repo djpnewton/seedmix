@@ -10,11 +10,11 @@
 #include <stdio.h>
 
 /* -- Action log ring buffer ------------------------------------------- */
-#define LOG_MAX   32
-#define LOG_LEN   96
-static char  log_buf[LOG_MAX][LOG_LEN];
-static int   log_head = 0;  // next write position
-static int   log_count = 0; // total entries (capped at LOG_MAX)
+#define LOG_MAX 32
+#define LOG_LEN 96
+static char log_buf[LOG_MAX][LOG_LEN];
+static int  log_head  = 0; // next write position
+static int  log_count = 0; // total entries (capped at LOG_MAX)
 
 void ui_log_add(const char* fmt, ...) {
     va_list args;
@@ -70,7 +70,10 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
     lv_obj_t* back = lv_button_create(s);
     lv_obj_set_size(back, 160, 50);
     lv_obj_align(back, LV_ALIGN_BOTTOM_MID, 0, -10);
-    union { ui_cb_t fn; void* vp; } u = { .fn = on_back };
+    union {
+        ui_cb_t fn;
+        void*   vp;
+    } u = {.fn = on_back};
     lv_obj_add_event_cb(back, ui_btn_invoke, LV_EVENT_CLICKED, u.vp);
     lv_obj_t* bl = lv_label_create(back);
     lv_label_set_text(bl, "Back");

@@ -1,0 +1,42 @@
+# clang-format configuration
+#
+#   4-space indentation, K&R (attached) braces, type* pointer alignment,
+#   aligned consecutive declarations/assignments, snake_case naming
+#   (naming itself is not enforced by clang-format).
+BasedOnStyle: LLVM
+
+Language: Cpp
+
+# -- Indentation ---------------------------------------------------------
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+IndentCaseLabels: false
+
+# -- Line length & wrapping ----------------------------------------------
+ColumnLimit: 100
+
+# -- Braces ---------------------------------------------------------------
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+
+# -- Pointers & spacing ---------------------------------------------------
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+# -- Alignment ------------------------------------------------------------
+AlignConsecutiveDeclarations: true
+AlignConsecutiveAssignments: true
+AlignConsecutiveMacros: false
+
+# -- Includes -------------------------------------------------------------
+SortIncludes: true
+IncludeBlocks: Preserve
+
+# -- Comments -------------------------------------------------------------
+# Keep hand-crafted section banners (/* -- Helpers ----... */) untouched.
+ReflowComments: false
+SpacesBeforeTrailingComments: 1

@@ -23,7 +23,9 @@ static void load_and_spin(void* param) {
     if (!fatal_scr) return;
     lv_scr_load(fatal_scr);
 #ifdef ESP_PLATFORM
-    while (1) { ui_delay_ms(5); }
+    while (1) {
+        ui_delay_ms(5);
+    }
 #else
     // schedule exit - the main loop will render the screen in the meantime
     lv_timer_create(do_exit, 3000, NULL);

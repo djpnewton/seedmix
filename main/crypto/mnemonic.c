@@ -12,16 +12,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <wally_core.h>
 #include <wally_bip39.h>
+#include <wally_core.h>
 
 #define MAX_ENTROPY_BYTES 32
 
 /* -- Helpers ---------------------------------------------------------- */
 struct mnemonic_t {
-    char* words;
+    char*           words;
     secure_stack_t* stack;
-    size_t entropy_len;  /* 16 or 32 */
+    size_t          entropy_len; /* 16 or 32 */
 };
 
 static bool word_count_valid(unsigned wc) { return wc == 12 || wc == 24; }
@@ -33,15 +33,16 @@ static size_t word_count_to_bytes(unsigned wc) {
 
 static size_t entropy_len_valid(size_t len) { return len == 16 || len == 32; }
 
-static void get_random(uint8_t *buf, size_t len, mnemonic_process_cb_t process_cb) {
+static void get_random(uint8_t* buf, size_t len, mnemonic_process_cb_t process_cb) {
     ASSERT_OR_DIE(buf && len > 0, "invalid buffer");
     ASSERT_OR_DIE(process_cb, "process callback is required");
 
     char process[64];
-    int res = snprintf(process, sizeof(process), "Generating %zu bytes of entropy from /dev/urandom...", len);
+    int  res = snprintf(process, sizeof(process),
+                       "Generating %zu bytes of entropy from /dev/urandom...", len);
     ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(process), "process string too long");
     process_cb(process);
-    FILE *f = fopen("/dev/urandom", "rb");
+    FILE* f = fopen("/dev/urandom", "rb");
     ASSERT_OR_DIE(f, "Failed to open /dev/urandom");
     size_t n = fread(buf, 1, len, f);
     ASSERT_OR_DIE(n == len, "Short read from /dev/urandom");
@@ -58,7 +59,7 @@ static mnemonic_t* mnemonic_alloc(char* words, size_t entropy_len) {
     m->entropy_len = entropy_len;
     m->stack       = secure_stack_create(2);
     ASSERT_OR_DIE(m->stack, "out of memory");
-    secure_stack_push(m->stack, (uint8_t *)words, strlen(words) + 1);
+    secure_stack_push(m->stack, (uint8_t*)words, strlen(words) + 1);
     return m;
 }
 
@@ -108,7 +109,8 @@ size_t mnemonic_to_entropy(const mnemonic_t* m, uint8_t* out) {
     ASSERT_OR_DIE(out, "null output buffer");
 
     size_t written = 0;
-    ASSERT_OR_DIE(bip39_mnemonic_to_bytes(NULL, m->words, out, m->entropy_len, &written) == WALLY_OK,
+    ASSERT_OR_DIE(bip39_mnemonic_to_bytes(NULL, m->words, out, m->entropy_len, &written) ==
+                      WALLY_OK,
                   "bip39_mnemonic_to_bytes failed");
     ASSERT_OR_DIE(written == m->entropy_len, "entropy size mismatch");
     return written;
@@ -127,7 +129,7 @@ mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b) {
         ea[i] ^= eb[i];
     }
 
-    size_t entropy_len = a->entropy_len;  // save before discard
+    size_t entropy_len = a->entropy_len; // save before discard
 
     mnemonic_discard(a);
     mnemonic_discard(b);
@@ -143,12 +145,15 @@ mnemonic_t* mnemonic_from_string(const char* words) {
     if (!words || !*words) return NULL;
 
     /* Validate via libwally */
-    size_t written = 0;
+    size_t  written = 0;
     uint8_t entropy[MAX_ENTROPY_BYTES];
-    int rc = bip39_mnemonic_to_bytes(NULL, words, entropy, sizeof(entropy), &written);
-    if (rc != WALLY_OK) { LOG_ERROR("Invalid mnemonic"); return NULL; }
+    int     rc = bip39_mnemonic_to_bytes(NULL, words, entropy, sizeof(entropy), &written);
+    if (rc != WALLY_OK) {
+        LOG_ERROR("Invalid mnemonic");
+        return NULL;
+    }
     /* Copy the string, determine length from written bytes */
-    char *copy = strdup(words);
+    char* copy = strdup(words);
     ASSERT_OR_DIE(copy, "out of memory");
     mnemonic_t* m = mnemonic_alloc(copy, written);
     LOG_INFO("Mnemonic from string (%zu-byte entropy)", written);
