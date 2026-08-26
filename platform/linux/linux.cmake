@@ -36,6 +36,7 @@ target_include_directories(lvgl PUBLIC ${SDL2_INCLUDE_DIRS})
 add_executable(${PROJECT_NAME}
     ${COMMON_SOURCES}
     platform/linux/main_linux.c
+    platform/linux/hal_linux.c
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

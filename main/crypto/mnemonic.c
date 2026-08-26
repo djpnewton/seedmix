@@ -4,11 +4,13 @@
  */
 
 #include "mnemonic.h"
+#include "hal.h"
 #include "secure_stack.h"
 #include "util/error.h"
 #include "util/log.h"
 #include "util/utils.h"
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,22 +34,6 @@ static size_t word_count_to_bytes(unsigned wc) {
 }
 
 static size_t entropy_len_valid(size_t len) { return len == 16 || len == 32; }
-
-static void get_random(uint8_t* buf, size_t len, mnemonic_process_cb_t process_cb) {
-    ASSERT_OR_DIE(buf && len > 0, "invalid buffer");
-    ASSERT_OR_DIE(process_cb, "process callback is required");
-
-    char process[64];
-    int  res = snprintf(process, sizeof(process),
-                       "Generating %zu bytes of entropy from /dev/urandom...", len);
-    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(process), "process string too long");
-    process_cb(process);
-    FILE* f = fopen("/dev/urandom", "rb");
-    ASSERT_OR_DIE(f, "Failed to open /dev/urandom");
-    size_t n = fread(buf, 1, len, f);
-    ASSERT_OR_DIE(n == len, "Short read from /dev/urandom");
-    fclose(f);
-}
 
 static mnemonic_t* mnemonic_alloc(char* words, size_t entropy_len) {
     ASSERT_OR_DIE(words, "null words");
@@ -83,7 +69,15 @@ mnemonic_t* mnemonic_generate(unsigned word_count, mnemonic_process_cb_t process
     ASSERT_OR_DIE(entropy_len <= MAX_ENTROPY_BYTES, "entropy length too large");
 
     uint8_t entropy[MAX_ENTROPY_BYTES];
-    get_random(entropy, entropy_len, process_cb);
+
+    char process[64];
+    int  res = snprintf(process, sizeof(process), "Generating %zu bytes of entropy from %s...",
+                       entropy_len, hal_get_random_source());
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(process), "process string too long");
+    process_cb(process);
+
+    hal_get_random(entropy, entropy_len);
+
     char* words = NULL;
     ASSERT_OR_DIE(bip39_mnemonic_from_bytes(NULL, entropy, entropy_len, &words) == WALLY_OK,
                   "bip39_mnemonic_from_bytes failed");
