@@ -7,6 +7,7 @@
 #define ERROR_H
 
 #include <stdarg.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,12 +19,13 @@ extern "C" {
  * If a display is active, renders a red screen with file, line, and message,
  * then spins forever.  Otherwise prints to stderr and exits.
  */
-void fatal_handler(const char *file, int line, const char *fmt, ...);
+void fatal_handler(const char* file, int line, const char* fmt, ...);
 
 /**
  * @brief Halt with file, line, and formatted message on the LVGL error screen.
  */
-#define FATAL(fmt, ...) fatal_handler(__FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define SHORT_FILE (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define FATAL(fmt, ...) fatal_handler(SHORT_FILE, __LINE__, fmt, ##__VA_ARGS__)
 
 /**
  * @brief If `expr` is false (0), call FATAL with the given format string.

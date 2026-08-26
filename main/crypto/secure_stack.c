@@ -19,13 +19,13 @@ struct secure_stack {
     size_t  count;
 };
 
-/* -- Secure zero ------------------------------------------------------ */
+// -- Secure zero ------------------------------------------------------
 static void secure_zero(void *ptr, size_t len) {
     volatile uint8_t *p = (volatile uint8_t *)ptr;
     while (len--) *p++ = 0;
 }
 
-/* -- Public API ------------------------------------------------------- */
+// -- Public API -------------------------------------------------------
 secure_stack_t *secure_stack_create(size_t capacity) {
     secure_stack_t *s = calloc(1, sizeof(*s));
     ASSERT_OR_DIE(s, "secure_stack_create: out of memory");
@@ -44,7 +44,7 @@ bool secure_stack_push(secure_stack_t *stack, uint8_t *data, size_t len) {
 }
 
 void secure_stack_pop(secure_stack_t *stack, uint8_t *data) {
-    (void)data; /* used in the ASSERT below */
+    (void)data; // used in the ASSERT below
     ASSERT_OR_DIE(stack->count > 0, "secure_stack_pop: stack is empty");
 
     stack->count--;

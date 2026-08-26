@@ -63,7 +63,9 @@ extern "C" {
  * Assets / Fonts
  *----------------------------------------------------------------------*/
 #define LV_FONT_MONTSERRAT_14   1
+#define LV_FONT_MONTSERRAT_18   1
 #define LV_FONT_MONTSERRAT_20   1
+#define LV_FONT_MONTSERRAT_24   1
 #define LV_FONT_MONTSERRAT_28   1
 #define LV_FONT_MONTSERRAT_48   1
 #define LV_USE_FONT_COMPRESSED  1
@@ -119,7 +121,7 @@ extern "C" {
 #define LV_USE_CHART            0
 #define LV_USE_COLORWHEEL       0
 #define LV_USE_IMGBTN           0
-#define LV_USE_KEYBOARD         0
+#define LV_USE_KEYBOARD         1
 #define LV_USE_LED              0
 #define LV_USE_LIST             0
 #define LV_USE_MENU             0

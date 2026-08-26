@@ -17,9 +17,13 @@ endif()
 set(COMMON_SOURCES
     main/main.c
     main/ui/ui.c
+    main/ui/word_entry.c
+    main/ui/log.c
     main/crypto/mnemonic.c
     main/crypto/secure_stack.c
+    main/crypto/bip39_wordlist.c
     main/util/error.c
+    main/util/utils.c
 )
 
 # -- Platform-Specific Setup ------------------------------------------------

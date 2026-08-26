@@ -1,39 +1,64 @@
 /**
  * @file main/crypto/mnemonic.h
- * @brief BIP39 mnemonic generation using libwally.
+ * @brief BIP39 mnemonic generation & entropy combining using libwally.
  */
 
 #ifndef MNEMONIC_H
 #define MNEMONIC_H
 
 #include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** A generated mnemonic.  Discard with mnemonic_discard() to zero it. */
 typedef struct mnemonic_t mnemonic_t;
 
-/** Access the words (read-only). */
-const char *mnemonic_words(const mnemonic_t *m);
+typedef void (*mnemonic_process_cb_t)(const char* process);
 
 /**
  * @brief Initialize libwally.
  */
 void mnemonic_init(void);
 
-/**
- * @brief Generate a BIP39 mnemonic (12 words).  The returned mnemonic
- *        owns a secure stack and must be discarded with mnemonic_discard().
- */
-mnemonic_t *mnemonic_generate(void);
+/** Access the words (read-only). */
+const char* mnemonic_words(const mnemonic_t* m);
 
 /**
- * @brief Zero the mnemonic, pop it from its secure stack, destroy the
- *        stack, and free all associated memory.
+ * @brief Generate `word_count` random words (12 or 24).
  */
-void mnemonic_discard(mnemonic_t *m);
+mnemonic_t* mnemonic_generate(unsigned word_count, mnemonic_process_cb_t process_cb);
+
+/**
+ * @brief Create a mnemonic from raw entropy bytes.
+ * @param bytes    Entropy (16 bytes -> 12 words, 32 bytes -> 24 words).
+ * @param byte_len Must be 16 or 32.
+ */
+mnemonic_t* mnemonic_from_entropy(const uint8_t* bytes, size_t byte_len);
+
+/**
+ * @brief Extract the raw entropy from a mnemonic.
+ * @param out     Buffer (must be at least mnemonic_entropy_size(m)).
+ * @return        Number of bytes written (16 or 32).
+ */
+size_t mnemonic_to_entropy(const mnemonic_t* m, uint8_t* out);
+
+/** Size of the entropy buffer (16 or 32). */
+size_t mnemonic_entropy_size(const mnemonic_t* m);
+
+/**
+ * @brief XOR the entropy of two mnemonics (must have the same word count).
+ *        The result is a new mnemonic.  Both inputs are discarded.
+ */
+mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b);
+
+/** Parse a space-separated mnemonic string (returns NULL on failure). */
+mnemonic_t* mnemonic_from_string(const char* words);
+
+/** Discard (zero + free). */
+void mnemonic_discard(mnemonic_t* m);
 
 #ifdef __cplusplus
 }
