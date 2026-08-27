@@ -9,6 +9,8 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include "compiler.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,7 +21,7 @@ extern "C" {
  * If a display is active, renders a red screen with file, line, and message,
  * then spins forever.  Otherwise prints to stderr and exits.
  */
-void fatal_handler(const char* file, int line, const char* fmt, ...);
+NORETURN void fatal_handler(const char* file, int line, const char* fmt, ...) PRINTF_LIKE(3, 4);
 
 /**
  * @brief Halt with file, line, and formatted message on the LVGL error screen.

@@ -12,25 +12,7 @@
 #include "ui/ui.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-/* -- Deferred loader (runs inside lv_timer_handler, must not block) --- */
-static void do_exit(lv_timer_t* t) {
-    (void)t;
-    exit(1);
-}
-static void load_and_spin(void* param) {
-    lv_obj_t* fatal_scr = (lv_obj_t*)param;
-    if (!fatal_scr) return;
-    lv_scr_load(fatal_scr);
-#ifdef ESP_PLATFORM
-    while (1) {
-        ui_delay_ms(5);
-    }
-#else
-    // schedule exit - the main loop will render the screen in the meantime
-    lv_timer_create(do_exit, 3000, NULL);
-#endif
-}
+#include <unistd.h>
 
 /* -- LVGL error screen ------------------------------------------------ */
 static void error_screen(const char* file, int line, const char* fmt, va_list args) {
@@ -75,8 +57,11 @@ static void error_screen(const char* file, int line, const char* fmt, va_list ar
     lv_obj_set_style_text_font(footer, &lv_font_montserrat_14, 0);
     lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, -10);
 
-    // defer screen load to next tick (works from event handlers)
-    lv_async_call(load_and_spin, scr);
+    // Render immediately: fatal_handler() may be running inside an LVGL
+    // timer/event callback, so we cannot rely on the main loop (or a
+    // deferred lv_async_call) to paint the screen for us.
+    lv_scr_load(scr);
+    lv_refr_now(NULL);
 }
 
 void fatal_handler(const char* file, int line, const char* fmt, ...) {
@@ -84,4 +69,13 @@ void fatal_handler(const char* file, int line, const char* fmt, ...) {
     va_start(args, fmt);
     error_screen(file, line, fmt, args);
     va_end(args);
+
+#ifdef ESP_PLATFORM
+    while (1) {
+        ui_delay_ms(5);
+    }
+#else
+    sleep(3);
+    exit(1);
+#endif
 }
