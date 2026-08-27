@@ -84,6 +84,10 @@ static void on_we_complete(void);
 
 static void on_merge_done(void) {
     ASSERT_OR_DIE(pending_new, "no pending mnemonic");
+    // The merge screen still holds entropy hex + words, it stays the active
+    // screen until ui_swap_screen() runs inside ui_show_mnemonic(), so scrub
+    // it now instead of waiting for deferred deletion
+    ui_scrub_screen(lv_screen_active());
     current     = mnemonic_combine(current, pending_new);
     pending_new = NULL;
     ui_show_mnemonic(mnemonic_words(current), merge_result_type, go_source);
