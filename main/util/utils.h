@@ -14,6 +14,18 @@ extern "C" {
 #endif
 
 /**
+ * @brief Securely zero a memory region.
+ *
+ * The wipe cannot be optimized away by the compiler.  Uses `explicit_bzero`
+ * if available and falls back to a volatile write loop elsewhere. 
+ * Use this for entropy, key material, and mnemonic buffers instead of plain memset().
+ *
+ * @param ptr  Buffer to zero (may be NULL, in which case this is a no-op).
+ * @param len  Number of bytes to zero.
+ */
+void secure_memzero(void* ptr, size_t len);
+
+/**
  * @brief Format bytes as lowercase hex.
  * @param data      Input bytes.
  * @param len       Number of bytes.
