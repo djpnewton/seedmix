@@ -113,6 +113,7 @@ size_t mnemonic_to_entropy(const mnemonic_t* m, uint8_t* out) {
 
 mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b) {
     ASSERT_OR_DIE(a && b, "null mnemonic");
+    ASSERT_OR_DIE(a != b, "cannot combine a mnemonic with itself");
     ASSERT_OR_DIE(a->entropy_len == b->entropy_len, "word count mismatch");
 
     uint8_t ea[MAX_ENTROPY_BYTES], eb[MAX_ENTROPY_BYTES];
@@ -122,6 +123,19 @@ mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b) {
     // XOR the entropy bytes together
     for (size_t i = 0; i < a->entropy_len; i++) {
         ea[i] ^= eb[i];
+    }
+
+    // If both inputs carried identical entropy the XOR is all zeros, which
+    // maps to the publicly known `abandon ... about` wallet.  Refuse to
+    // produce it
+    uint8_t acc = 0;
+    for (size_t i = 0; i < a->entropy_len; i++) {
+        acc |= ea[i];
+    }
+    if (acc == 0) {
+        wally_bzero(ea, sizeof(ea));
+        wally_bzero(eb, sizeof(eb));
+        FATAL("inputs have identical entropy - combined result would be zero");
     }
 
     size_t entropy_len = a->entropy_len; // save before discard
@@ -139,7 +153,7 @@ mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b) {
 mnemonic_t* mnemonic_from_string(const char* words) {
     if (!words || !*words) return NULL;
 
-    /* Validate via libwally */
+    // Validate via libwally
     size_t  written = 0;
     uint8_t entropy[MAX_ENTROPY_BYTES];
     int     rc = bip39_mnemonic_to_bytes(NULL, words, entropy, sizeof(entropy), &written);
@@ -148,8 +162,14 @@ mnemonic_t* mnemonic_from_string(const char* words) {
         LOG_ERROR("Invalid mnemonic");
         return NULL;
     }
-    /* Copy the string, determine length from written bytes.  Allocate with
-     * libwally so mnemonic_discard() can release it via wally_free_string(). */
+    // bip39_mnemonic_to_bytes accepts any valid BIP39 length (12/15/18/21/24
+    // words), but we only support 12 and 24
+    if (!entropy_len_valid(written)) {
+        LOG_ERROR("Unsupported word count (entropy %zu bytes)", written);
+        return NULL;
+    }
+    // Copy the string, determine length from written bytes.  Allocate with
+    // libwally so mnemonic_discard() can release it via wally_free_string()
     char* copy = wally_strdup(words);
     ASSERT_OR_DIE(copy, "out of memory");
     mnemonic_t* m = mnemonic_alloc(copy, written);

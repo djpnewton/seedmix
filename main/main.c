@@ -44,18 +44,35 @@ static void on_generating_msg(const char* msg) {
     ui_delay_ms(1500);
 }
 
+// Combine `m` into `current` if the word counts match, otherwise discard `m`
+// and return to the source screen
+static void merge_or_reject(mnemonic_t* m, mnemonic_type_t result_type, const char* source_desc) {
+    if (current && mnemonic_entropy_size(current) != mnemonic_entropy_size(m)) {
+        ui_log_add("Rejected %s: word count mismatch", source_desc);
+        mnemonic_discard(m);
+        ui_show_msg("Word count mismatch - mnemonic discarded");
+        ui_delay_ms(1500);
+        go_source();
+        return;
+    }
+    if (current) {
+        ui_log_add("Combined with %s", source_desc);
+        show_merge_screen(m, result_type);
+    } else {
+        current = m;
+        ui_log_add("%s", source_desc);
+        ui_show_mnemonic(mnemonic_words(current), result_type, go_source);
+    }
+}
+
 static void on_generate(void) {
     ui_show_msg("Generating words...");
     ui_delay_ms(500);
     mnemonic_t* m = mnemonic_generate(word_count, on_generating_msg);
-    if (current) {
-        ui_log_add("Combined with generated %u-word", word_count);
-        show_merge_screen(m, MNEMONIC_TYPE_MERGED);
-    } else {
-        current = m;
-        ui_log_add("Generated %u-word mnemonic", word_count);
-        ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_GENERATED, go_source);
-    }
+    char        desc[48];
+    int         res = snprintf(desc, sizeof(desc), "generated %u-word", word_count);
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
+    merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
 }
 
 static word_entry_handle_t we_handle         = NULL;
@@ -268,14 +285,10 @@ static void on_camera_use(void) {
 
     camera_release();
 
-    if (current) {
-        ui_log_add("Combined with %u-word camera image", word_count);
-        show_merge_screen(m, MNEMONIC_TYPE_MERGED);
-    } else {
-        current = m;
-        ui_log_add("Generated %u-word mnemonic from camera image", word_count);
-        ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_GENERATED, go_source);
-    }
+    char desc[48];
+    int  res = snprintf(desc, sizeof(desc), "%u-word camera image", word_count);
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
+    merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
 }
 
 static void on_scan_qr(void) { FATAL("Scan QR not yet implemented."); }
@@ -295,17 +308,15 @@ static void on_we_complete(void) {
     mnemonic_t* m = mnemonic_from_string(buf);
     secure_memzero(buf, sizeof(buf));
     if (!m) {
+        ui_show_msg("Invalid mnemonic");
+        ui_delay_ms(1500);
         ui_show_main(on_new_wallet, on_test_error);
         return;
     }
-    if (current) {
-        ui_log_add("Combined with entered %u-word", word_count);
-        show_merge_screen(m, MNEMONIC_TYPE_MERGED);
-    } else {
-        current = m;
-        ui_log_add("Entered %u-word mnemonic", word_count);
-        ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_ENTERED, go_source);
-    }
+    char desc[48];
+    int  res = snprintf(desc, sizeof(desc), "entered %u-word", word_count);
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
+    merge_or_reject(m, MNEMONIC_TYPE_ENTERED, desc);
 }
 
 // -- Re-enter source with correct title based on state -----------------
