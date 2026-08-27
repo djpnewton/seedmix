@@ -148,8 +148,9 @@ mnemonic_t* mnemonic_from_string(const char* words) {
         LOG_ERROR("Invalid mnemonic");
         return NULL;
     }
-    /* Copy the string, determine length from written bytes */
-    char* copy = strdup(words);
+    /* Copy the string, determine length from written bytes.  Allocate with
+     * libwally so mnemonic_discard() can release it via wally_free_string(). */
+    char* copy = wally_strdup(words);
     ASSERT_OR_DIE(copy, "out of memory");
     mnemonic_t* m = mnemonic_alloc(copy, written);
     LOG_INFO("Mnemonic from string (%zu-byte entropy)", written);
@@ -160,7 +161,7 @@ void mnemonic_discard(mnemonic_t* m) {
     ASSERT_OR_DIE(m, "null mnemonic");
     if (m->words && m->stack) {
         secure_stack_pop(m->stack, (uint8_t*)m->words);
-        free(m->words);
+        wally_free_string(m->words);
         LOG_INFO("mnemonic zeroed and freed");
     }
     if (m->stack) secure_stack_destroy(m->stack);
