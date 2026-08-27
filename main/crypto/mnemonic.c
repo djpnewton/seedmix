@@ -202,5 +202,6 @@ void mnemonic_discard(mnemonic_t* m) {
         LOG_INFO("mnemonic zeroed and freed");
     }
     if (m->stack) secure_stack_destroy(m->stack);
+    secure_memzero(m, sizeof(*m));
     free(m);
 }
