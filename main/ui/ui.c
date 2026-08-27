@@ -141,11 +141,11 @@ void ui_show_word_count(ui_cb_t on_12, ui_cb_t on_24) {
     ui_swap_screen(s);
 }
 
-void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_scan_qr, ui_cb_t on_state,
-                    ui_cb_t on_finish, bool is_additional) {
+void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_other_source,
+                    ui_cb_t on_state, ui_cb_t on_finish, bool is_additional) {
     ASSERT_OR_DIE(on_generate, "null on_generate");
     ASSERT_OR_DIE(on_enter, "null on_enter");
-    ASSERT_OR_DIE(on_scan_qr, "null on_scan_qr");
+    ASSERT_OR_DIE(on_other_source, "null on_other_source");
     ASSERT_OR_DIE(on_state, "null on_state");
     ASSERT_OR_DIE(on_finish, "null on_finish");
 
@@ -153,7 +153,7 @@ void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_scan_qr, u
     ui_add_title(s, is_additional ? "Choose Additional Source" : "Choose Initial Source");
     add_btn(s, "Generate Here", on_generate, -40);
     add_btn(s, "Enter Manually", on_enter, 30);
-    add_btn(s, "Scan QR Code", on_scan_qr, 100);
+    add_btn(s, "Other Source", on_other_source, 100);
 
     // state button (top-left)
     lv_obj_t* state_btn = lv_button_create(s);
@@ -182,6 +182,119 @@ void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_scan_qr, u
     lv_label_set_text(fl, "Finish");
     lv_obj_set_style_text_font(fl, &lv_font_montserrat_14, 0);
     lv_obj_center(fl);
+
+    ui_swap_screen(s);
+}
+
+void ui_show_other_source(ui_cb_t on_camera, ui_cb_t on_scan_qr, ui_cb_t on_dice, ui_cb_t on_coins,
+                          ui_cb_t on_back) {
+    ASSERT_OR_DIE(on_camera, "null on_camera");
+    ASSERT_OR_DIE(on_scan_qr, "null on_scan_qr");
+    ASSERT_OR_DIE(on_dice, "null on_dice");
+    ASSERT_OR_DIE(on_coins, "null on_coins");
+    ASSERT_OR_DIE(on_back, "null on_back");
+
+    lv_obj_t* s = ui_make_screen();
+    ui_add_title(s, "Other Sources");
+    add_btn(s, "Camera Image", on_camera, -90);
+    add_btn(s, "Scan QR", on_scan_qr, -15);
+    add_btn(s, "Dice Rolls", on_dice, 60);
+    add_btn(s, "Coin Flips", on_coins, 135);
+
+    /* back button (bottom-right) */
+    lv_obj_t* back_btn = lv_button_create(s);
+    lv_obj_set_size(back_btn, 70, 30);
+    lv_obj_align(back_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+    union {
+        ui_cb_t fn;
+        void*   vp;
+    } ub = {.fn = on_back};
+    lv_obj_add_event_cb(back_btn, ui_btn_invoke, LV_EVENT_CLICKED, ub.vp);
+    lv_obj_t* bl = lv_label_create(back_btn);
+    lv_label_set_text(bl, "Back");
+    lv_obj_set_style_text_font(bl, &lv_font_montserrat_14, 0);
+    lv_obj_center(bl);
+
+    ui_swap_screen(s);
+}
+
+void ui_show_camera_image(const uint8_t* rgb565, uint32_t w, uint32_t h, ui_cb_t on_use,
+                          ui_cb_t on_retake, ui_cb_t on_back) {
+    ASSERT_OR_DIE(rgb565, "null rgb565");
+    ASSERT_OR_DIE(w > 0 && h > 0, "invalid camera image size");
+    ASSERT_OR_DIE(on_use, "null on_use");
+    ASSERT_OR_DIE(on_retake, "null on_retake");
+    ASSERT_OR_DIE(on_back, "null on_back");
+
+    lv_obj_t* s = ui_make_screen();
+    ui_add_title(s, "Camera Image");
+
+    static lv_image_dsc_t dsc;
+    memset(&dsc, 0, sizeof(dsc));
+    dsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
+    dsc.header.cf     = LV_COLOR_FORMAT_RGB565;
+    dsc.header.w      = (uint16_t)w;
+    dsc.header.h      = (uint16_t)h;
+    dsc.header.stride = (uint16_t)(w * 2);
+    dsc.data_size     = w * h * 2;
+    dsc.data          = rgb565;
+
+    lv_obj_t* img = lv_image_create(s);
+    lv_image_set_src(img, &dsc);
+
+    /* Fit the image into a 300x200 area, preserving the aspect ratio. */
+    uint32_t disp_w = w, disp_h = h;
+    if (w > 300 || h > 200) {
+        uint32_t zx = (256 * 300) / w;
+        uint32_t zy = (256 * 200) / h;
+        uint32_t z  = (zx < zy) ? zx : zy;
+        disp_w      = (w * z) / 256;
+        disp_h      = (h * z) / 256;
+    }
+    lv_obj_set_size(img, disp_w, disp_h);
+    lv_image_set_inner_align(img, LV_IMAGE_ALIGN_STRETCH);
+    lv_obj_align(img, LV_ALIGN_TOP_MID, 0, 45);
+
+    /* back button (top-left) */
+    union {
+        ui_cb_t fn;
+        void*   vp;
+    } ub               = {.fn = on_back};
+    lv_obj_t* back_btn = lv_button_create(s);
+    lv_obj_set_size(back_btn, 70, 30);
+    lv_obj_align(back_btn, LV_ALIGN_TOP_LEFT, 10, 10);
+    lv_obj_add_event_cb(back_btn, ui_btn_invoke, LV_EVENT_CLICKED, ub.vp);
+    lv_obj_t* back_lbl = lv_label_create(back_btn);
+    lv_label_set_text(back_lbl, "Back");
+    lv_obj_set_style_text_font(back_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_center(back_lbl);
+
+    /* "Use Image" (left) and "Get Another" (right). */
+    union {
+        ui_cb_t fn;
+        void*   vp;
+    } u_use           = {.fn = on_use};
+    lv_obj_t* use_btn = lv_button_create(s);
+    lv_obj_set_size(use_btn, 180, 55);
+    lv_obj_align(use_btn, LV_ALIGN_BOTTOM_LEFT, 20, -10);
+    lv_obj_add_event_cb(use_btn, ui_btn_invoke, LV_EVENT_CLICKED, u_use.vp);
+    lv_obj_t* use_lbl = lv_label_create(use_btn);
+    lv_label_set_text(use_lbl, "Use Image");
+    lv_obj_set_style_text_font(use_lbl, &lv_font_montserrat_24, 0);
+    lv_obj_center(use_lbl);
+
+    union {
+        ui_cb_t fn;
+        void*   vp;
+    } u_retake           = {.fn = on_retake};
+    lv_obj_t* retake_btn = lv_button_create(s);
+    lv_obj_set_size(retake_btn, 180, 55);
+    lv_obj_align(retake_btn, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
+    lv_obj_add_event_cb(retake_btn, ui_btn_invoke, LV_EVENT_CLICKED, u_retake.vp);
+    lv_obj_t* retake_lbl = lv_label_create(retake_btn);
+    lv_label_set_text(retake_lbl, "Get Another");
+    lv_obj_set_style_text_font(retake_lbl, &lv_font_montserrat_24, 0);
+    lv_obj_center(retake_lbl);
 
     ui_swap_screen(s);
 }

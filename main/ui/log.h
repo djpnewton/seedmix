@@ -3,8 +3,8 @@
  * @brief Action log ring buffer and state screen.
  */
 
-#ifndef LOG_H
-#define LOG_H
+#ifndef UI_LOG_H
+#define UI_LOG_H
 
 #include "lvgl.h"
 #include "ui.h"
@@ -20,4 +20,4 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words);
 }
 #endif
 
-#endif /* LOG_H */
+#endif /* UI_LOG_H */

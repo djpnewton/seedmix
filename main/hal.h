@@ -10,6 +10,7 @@
 #ifndef HAL_H
 #define HAL_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -32,6 +33,61 @@ const char* hal_get_random_source();
  * @param len  Number of bytes to fill (must be > 0).
  */
 void hal_get_random(uint8_t* buf, size_t len);
+
+/**
+ * @brief Pixel formats that hal_camera_capture() may return.
+ */
+typedef enum {
+    HAL_CAMERA_FMT_UNKNOWN = 0, /**< Unrecognized format. */
+    HAL_CAMERA_FMT_GRAY8,       /**< 8-bit grayscale, 1 byte/pixel. */
+    HAL_CAMERA_FMT_YUYV,        /**< YUYV 4:2:2 packed, 2 bytes/pixel. */
+    HAL_CAMERA_FMT_RGB565,      /**< RGB565 packed, 2 bytes/pixel. */
+    HAL_CAMERA_FMT_JPEG,        /**< JPEG-compressed frame. */
+} hal_camera_pixfmt_t;
+
+/**
+ * @brief A single captured camera frame.
+ *
+ * The `data` buffer is owned by this struct and must be released with
+ * hal_camera_frame_free() when no longer needed.
+ */
+typedef struct {
+    uint8_t*            data;           /**< Frame bytes. */
+    size_t              size;           /**< Number of valid bytes in `data`. */
+    uint32_t            width;          /**< Image width in pixels. */
+    uint32_t            height;         /**< Image height in pixels. */
+    uint32_t            bytes_per_line; /**< Row stride in bytes (0 if packed). */
+    hal_camera_pixfmt_t pixfmt;         /**< Pixel format of `data`. */
+} hal_camera_frame_t;
+
+/**
+ * @brief Check whether a camera source is available.
+ *
+ * On Linux this probes a Video4Linux2 capture device (default /dev/video0,
+ * override with the HAL_CAMERA_DEV environment variable).
+ *
+ * @return true if a camera is present and can be captured.
+ */
+bool hal_camera_available(void);
+
+/**
+ * @brief Capture one frame from the camera.
+ *
+ * On success the frame's `data` buffer is allocated and must be released
+ * with hal_camera_frame_free().  On failure (e.g. no camera present or a
+ * timeout) returns false and leaves the frame untouched.
+ *
+ * @param frame  Output frame (must not be NULL).
+ * @return true if a frame was captured.
+ */
+bool hal_camera_capture(hal_camera_frame_t* frame);
+
+/**
+ * @brief Release a frame captured with hal_camera_capture().
+ *
+ * Zeroes and frees `frame->data` and resets the struct.
+ */
+void hal_camera_frame_free(hal_camera_frame_t* frame);
 
 #ifdef __cplusplus
 }
