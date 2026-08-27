@@ -5,6 +5,7 @@
 
 #include "ui.h"
 #include "mnemonic_view.h"
+#include "src/widgets/label/lv_label_private.h"
 #include "util/error.h"
 #include "util/utils.h"
 #include <string.h>
@@ -19,6 +20,29 @@ static lv_obj_t* entered_ta = NULL;
 static char      entered_buf[512];
 static lv_obj_t* prev_screen = NULL; // track for deferred cleanup
 
+// Recursively zero the text of every label under `obj`.  lv_label_set_text()
+// copies strings into LVGL-allocated memory; freeing the object does NOT wipe
+// those copies, so mnemonic words and entropy hex would linger in the heap.
+static void wipe_label_texts(lv_obj_t* obj) {
+    uint32_t n = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < n; i++) {
+        wipe_label_texts(lv_obj_get_child(obj, i));
+    }
+    if (lv_obj_has_class(obj, &lv_label_class)) {
+        lv_label_t* label = (lv_label_t*)obj;
+        if (label->text) secure_memzero(label->text, strlen(label->text));
+        if (label->dot_tmp_alloc && label->dot.tmp_ptr) {
+            secure_memzero(label->dot.tmp_ptr, strlen(label->dot.tmp_ptr));
+        } else {
+            secure_memzero(label->dot.tmp, sizeof(label->dot.tmp));
+        }
+    }
+}
+
+void ui_scrub_screen(lv_obj_t* scr) {
+    if (scr && scr != main_scr) wipe_label_texts(scr);
+}
+
 lv_obj_t* ui_make_screen(void) {
     lv_obj_t* s = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(s, lv_color_black(), 0);
@@ -28,7 +52,10 @@ lv_obj_t* ui_make_screen(void) {
 // Deferred screen deletion - safe to call from event handlers
 static void delete_screen_cb(void* ptr) {
     lv_obj_t* scr = (lv_obj_t*)ptr;
-    if (scr && scr != main_scr) lv_obj_delete(scr);
+    if (scr && scr != main_scr) {
+        wipe_label_texts(scr); // wipe secrets before freeing
+        lv_obj_delete(scr);
+    }
 }
 
 void ui_swap_screen(lv_obj_t* new_scr) {

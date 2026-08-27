@@ -42,6 +42,15 @@ void ui_show_msg(const char* msg);
 void ui_delay_ms(uint32_t ms);
 void ui_go_main(void);
 
+/**
+ * @brief Zero all label text on @p scr (recursively) without deleting it.
+ *
+ * lv_label_set_text() copies strings into LVGL heap memory.  Call this on a
+ * screen that displayed secrets (mnemonic words, entropy hex) as soon as it
+ * is no longer shown, so the copies don't linger until deferred deletion.
+ */
+void ui_scrub_screen(lv_obj_t* scr);
+
 #ifdef __cplusplus
 }
 #endif
