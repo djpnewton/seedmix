@@ -45,7 +45,8 @@ static mnemonic_t* mnemonic_alloc(char* words, size_t entropy_len) {
     m->entropy_len = entropy_len;
     m->stack       = secure_stack_create(2);
     ASSERT_OR_DIE(m->stack, "out of memory");
-    secure_stack_push(m->stack, (uint8_t*)words, strlen(words) + 1);
+    ASSERT_OR_DIE(secure_stack_push(m->stack, (uint8_t*)words, strlen(words) + 1),
+                  "secure_stack_push failed");
     return m;
 }
 
@@ -142,6 +143,7 @@ mnemonic_t* mnemonic_from_string(const char* words) {
     size_t  written = 0;
     uint8_t entropy[MAX_ENTROPY_BYTES];
     int     rc = bip39_mnemonic_to_bytes(NULL, words, entropy, sizeof(entropy), &written);
+    secure_memzero(entropy, sizeof(entropy));
     if (rc != WALLY_OK) {
         LOG_ERROR("Invalid mnemonic");
         return NULL;

@@ -9,6 +9,7 @@
 #include "hal.h"
 #include "util/error.h"
 #include "util/log.h"
+#include "util/utils.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -236,7 +237,7 @@ bool hal_camera_capture(hal_camera_frame_t* frame) {
 void hal_camera_frame_free(hal_camera_frame_t* frame) {
     if (!frame) return;
     if (frame->data) {
-        memset(frame->data, 0, frame->size);
+        secure_memzero(frame->data, frame->size);
         free(frame->data);
     }
     memset(frame, 0, sizeof(*frame));

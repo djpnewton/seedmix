@@ -7,6 +7,7 @@
 #include "crypto/bip39_wordlist.h"
 #include "ui_internal.h"
 #include "util/error.h"
+#include "util/utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -266,10 +267,11 @@ static void we_go_back(lv_event_t* e) {
         return;
     }
     char* last = strrchr(c->result, ' ');
-    if (last)
-        *last = '\0';
-    else
-        c->result[0] = '\0';
+    if (last) {
+        secure_memzero(last, strlen(last) + 1);
+    } else {
+        secure_memzero(c->result, strlen(c->result) + 1);
+    }
     c->current--;
     c->prefix[0] = '\0';
 
@@ -294,5 +296,6 @@ void ui_word_entry_discard(word_entry_handle_t handle) {
     we_ctx_t* c = (we_ctx_t*)handle;
     ASSERT_OR_DIE(c, "null context");
     if (c->entry_screen) lv_async_call(delete_screen_async, c->entry_screen);
+    secure_memzero(c, sizeof(*c));
     free(c);
 }

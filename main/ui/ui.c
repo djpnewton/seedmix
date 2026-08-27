@@ -6,6 +6,7 @@
 #include "ui.h"
 #include "mnemonic_view.h"
 #include "util/error.h"
+#include "util/utils.h"
 #include <string.h>
 
 #ifndef ESP_PLATFORM
@@ -420,6 +421,8 @@ void ui_show_merge_process(const char* current_words, const char* current_entrop
 
 void ui_show_enter_words(ui_cb_t on_ok) {
     ASSERT_OR_DIE(on_ok, "null on_ok");
+
+    secure_memzero(entered_buf, sizeof(entered_buf));
 
     lv_obj_t* s = ui_make_screen();
     ui_add_title(s, "Enter Mnemonic");

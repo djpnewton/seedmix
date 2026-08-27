@@ -5,6 +5,7 @@
 
 #include "mnemonic_view.h"
 #include "util/error.h"
+#include "util/utils.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -95,4 +96,6 @@ void ui_mnemonic_view_set_words(lv_obj_t* view, const char* words) {
         lv_obj_set_style_text_font(word_lbl, &lv_font_montserrat_14, 0);
         lv_label_set_long_mode(word_lbl, LV_LABEL_LONG_DOT);
     }
+
+    secure_memzero(buf, sizeof(buf));
 }

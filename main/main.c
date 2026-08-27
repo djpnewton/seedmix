@@ -92,6 +92,13 @@ static void show_merge_screen(mnemonic_t* new_m, mnemonic_type_t result_type) {
                           on_merge_done);
 
     mnemonic_discard(preview);
+    // Wipe entropy buffers and their hex renderings after use
+    secure_memzero(ca_hex, sizeof(ca_hex));
+    secure_memzero(na_hex, sizeof(na_hex));
+    secure_memzero(ma_hex, sizeof(ma_hex));
+    secure_memzero(ma, sizeof(ma));
+    secure_memzero(na, sizeof(na));
+    secure_memzero(ca, sizeof(ca));
 }
 
 static void on_we_cancel(void) {
@@ -128,6 +135,7 @@ static uint16_t yuv_to_rgb565(int y, int u, int v) {
 
 static void camera_release(void) {
     if (camera_rgb565) {
+        secure_memzero(camera_rgb565, (size_t)camera_w * camera_h * 2);
         free(camera_rgb565);
         camera_rgb565 = NULL;
     }
@@ -256,7 +264,7 @@ static void on_camera_use(void) {
     sha256_expand(camera_frame.data, camera_frame.size, entropy, elen);
 
     mnemonic_t* m = mnemonic_from_entropy(entropy, elen);
-    memset(entropy, 0, sizeof(entropy));
+    secure_memzero(entropy, sizeof(entropy));
 
     camera_release();
 
@@ -280,10 +288,12 @@ static void on_we_complete(void) {
     const char* txt = ui_word_entry_result(we_handle);
     char        buf[512];
     strncpy(buf, txt, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
     ui_word_entry_discard(we_handle);
     we_handle = NULL;
 
     mnemonic_t* m = mnemonic_from_string(buf);
+    secure_memzero(buf, sizeof(buf));
     if (!m) {
         ui_show_main(on_new_wallet, on_test_error);
         return;

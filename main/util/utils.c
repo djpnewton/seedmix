@@ -7,9 +7,24 @@
 #include "error.h"
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 #include <wally_core.h>
 #include <wally_crypto.h>
+
+void secure_memzero(void* ptr, size_t len) {
+    if (!ptr || len == 0) return;
+
+#if defined(__GLIBC__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) ||   \
+    defined(__DragonFly__) || defined(__APPLE__)
+    // Non-elidable wipe from the C library
+    explicit_bzero(ptr, len);
+#else
+    // Portable fallback (e.g. ESP-IDF newlib): volatile store loop
+    volatile uint8_t* p = (volatile uint8_t*)ptr;
+    while (len--) *p++ = 0;
+#endif
+}
 
 void bytes_to_hex(const uint8_t* data, size_t len, char* out, size_t out_size) {
     ASSERT_OR_DIE(data && len > 0, "invalid data");
@@ -51,5 +66,5 @@ void sha256_expand(const uint8_t* data, size_t data_len, uint8_t* out, size_t ou
         counter++;
     }
 
-    wally_bzero(seed, sizeof(seed));
+    secure_memzero(seed, sizeof(seed));
 }

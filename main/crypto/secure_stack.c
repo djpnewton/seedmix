@@ -5,6 +5,7 @@
 
 #include "secure_stack.h"
 #include "util/error.h"
+#include "util/utils.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -18,12 +19,6 @@ struct secure_stack {
     size_t  capacity;
     size_t  count;
 };
-
-// -- Secure zero ------------------------------------------------------
-static void secure_zero(void* ptr, size_t len) {
-    volatile uint8_t* p = (volatile uint8_t*)ptr;
-    while (len--) *p++ = 0;
-}
 
 // -- Public API -------------------------------------------------------
 secure_stack_t* secure_stack_create(size_t capacity) {
@@ -53,7 +48,7 @@ void secure_stack_pop(secure_stack_t* stack, uint8_t* data) {
     ASSERT_OR_DIE(item->data == data, "secure_stack_pop: pointer mismatch (expected %p, got %p)",
                   (void*)item->data, (void*)data);
 
-    secure_zero(item->data, item->len);
+    secure_memzero(item->data, item->len);
     item->data = NULL;
     item->len  = 0;
 }
