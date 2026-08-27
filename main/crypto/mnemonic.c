@@ -40,11 +40,14 @@ static mnemonic_t* mnemonic_alloc(char* words, size_t entropy_len) {
     ASSERT_OR_DIE(entropy_len_valid(entropy_len), "entropy length must be 16 or 32");
 
     mnemonic_t* m = calloc(1, sizeof(*m));
-    ASSERT_OR_DIE(m, "out of memory");
+    if (!m) return NULL;
     m->words       = words;
     m->entropy_len = entropy_len;
     m->stack       = secure_stack_create(2);
-    ASSERT_OR_DIE(m->stack, "out of memory");
+    if (!m->stack) {
+        free(m);
+        return NULL;
+    }
     ASSERT_OR_DIE(secure_stack_push(m->stack, (uint8_t*)words, strlen(words) + 1),
                   "secure_stack_push failed");
     return m;
@@ -69,7 +72,7 @@ mnemonic_t* mnemonic_generate(unsigned word_count, mnemonic_process_cb_t process
     size_t entropy_len = word_count_to_bytes(word_count);
     ASSERT_OR_DIE(entropy_len <= MAX_ENTROPY_BYTES, "entropy length too large");
 
-    uint8_t entropy[MAX_ENTROPY_BYTES];
+    uint8_t entropy[MAX_ENTROPY_BYTES] = {0};
 
     char process[64];
     int  res = snprintf(process, sizeof(process), "Generating %zu bytes of entropy from %s...",
@@ -79,11 +82,17 @@ mnemonic_t* mnemonic_generate(unsigned word_count, mnemonic_process_cb_t process
 
     hal_get_random(entropy, entropy_len);
 
-    char* words = NULL;
-    ASSERT_OR_DIE(bip39_mnemonic_from_bytes(NULL, entropy, entropy_len, &words) == WALLY_OK,
-                  "bip39_mnemonic_from_bytes failed");
-    wally_bzero(entropy, sizeof(entropy));
-    mnemonic_t* m = mnemonic_alloc(words, entropy_len);
+    char*       words = NULL;
+    mnemonic_t* m     = NULL;
+    if (bip39_mnemonic_from_bytes(NULL, entropy, entropy_len, &words) == WALLY_OK) {
+        m = mnemonic_alloc(words, entropy_len);
+    }
+
+    secure_memzero(entropy, sizeof(entropy));
+    if (!m) {
+        if (words) wally_free_string(words);
+        FATAL("mnemonic generation failed");
+    }
     LOG_INFO("Mnemonic generated (%u words)", word_count);
     return m;
 }
@@ -95,6 +104,10 @@ mnemonic_t* mnemonic_from_entropy(const uint8_t* bytes, size_t byte_len) {
     ASSERT_OR_DIE(bip39_mnemonic_from_bytes(NULL, bytes, byte_len, &words) == WALLY_OK,
                   "bip39_mnemonic_from_bytes failed");
     mnemonic_t* m = mnemonic_alloc(words, byte_len);
+    if (!m) {
+        wally_free_string(words);
+        FATAL("mnemonic allocation failed");
+    }
     LOG_INFO("Mnemonic from entropy (%zu bytes)", byte_len);
     return m;
 }
@@ -116,7 +129,7 @@ mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b) {
     ASSERT_OR_DIE(a != b, "cannot combine a mnemonic with itself");
     ASSERT_OR_DIE(a->entropy_len == b->entropy_len, "word count mismatch");
 
-    uint8_t ea[MAX_ENTROPY_BYTES], eb[MAX_ENTROPY_BYTES];
+    uint8_t ea[MAX_ENTROPY_BYTES] = {0}, eb[MAX_ENTROPY_BYTES] = {0};
     mnemonic_to_entropy(a, ea);
     mnemonic_to_entropy(b, eb);
 
@@ -133,8 +146,8 @@ mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b) {
         acc |= ea[i];
     }
     if (acc == 0) {
-        wally_bzero(ea, sizeof(ea));
-        wally_bzero(eb, sizeof(eb));
+        secure_memzero(ea, sizeof(ea));
+        secure_memzero(eb, sizeof(eb));
         FATAL("inputs have identical entropy - combined result would be zero");
     }
 
@@ -144,8 +157,8 @@ mnemonic_t* mnemonic_combine(mnemonic_t* a, mnemonic_t* b) {
     mnemonic_discard(b);
 
     mnemonic_t* result = mnemonic_from_entropy(ea, entropy_len);
-    wally_bzero(ea, sizeof(ea));
-    wally_bzero(eb, sizeof(eb));
+    secure_memzero(ea, sizeof(ea));
+    secure_memzero(eb, sizeof(eb));
     LOG_INFO("Mnemonics combined");
     return result;
 }
@@ -173,6 +186,10 @@ mnemonic_t* mnemonic_from_string(const char* words) {
     char* copy = wally_strdup(words);
     ASSERT_OR_DIE(copy, "out of memory");
     mnemonic_t* m = mnemonic_alloc(copy, written);
+    if (!m) {
+        wally_free_string(copy);
+        FATAL("mnemonic allocation failed");
+    }
     LOG_INFO("Mnemonic from string (%zu-byte entropy)", written);
     return m;
 }

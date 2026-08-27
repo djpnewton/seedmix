@@ -101,25 +101,27 @@ static void show_merge_screen(mnemonic_t* new_m, mnemonic_type_t result_type) {
     for (size_t i = 0; i < elen; i++) ma[i] = ca[i] ^ na[i];
 
     mnemonic_t* preview = mnemonic_from_entropy(ma, elen);
-    merge_result_type   = result_type;
-    pending_new         = new_m;
 
     char ca_hex[65], na_hex[65], ma_hex[65];
     bytes_to_hex(ca, elen, ca_hex, sizeof(ca_hex));
     bytes_to_hex(na, elen, na_hex, sizeof(na_hex));
     bytes_to_hex(ma, elen, ma_hex, sizeof(ma_hex));
 
+    secure_memzero(ma, sizeof(ma));
+    secure_memzero(na, sizeof(na));
+    secure_memzero(ca, sizeof(ca));
+
+    merge_result_type = result_type;
+    pending_new       = new_m;
+
     ui_show_merge_process(mnemonic_words(current), ca_hex, na_hex, ma_hex, mnemonic_words(preview),
                           on_merge_done);
 
     mnemonic_discard(preview);
-    // Wipe entropy buffers and their hex renderings after use
+    // Wipe the hex renderings after use
     secure_memzero(ca_hex, sizeof(ca_hex));
     secure_memzero(na_hex, sizeof(na_hex));
     secure_memzero(ma_hex, sizeof(ma_hex));
-    secure_memzero(ma, sizeof(ma));
-    secure_memzero(na, sizeof(na));
-    secure_memzero(ca, sizeof(ca));
 }
 
 static void on_we_cancel(void) {
