@@ -5,7 +5,9 @@
 
 #include "bip39_wordlist.h"
 #include "util/error.h"
+
 #include <ctype.h>
+#include <stdbool.h>
 #include <string.h>
 #include <wally_bip39.h>
 

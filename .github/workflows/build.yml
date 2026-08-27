@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        build:
+          - Debug
+          - asan
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libtool-bin \
+            libsdl2-dev
+
+      - name: Build (${{ matrix.build }})
+        run: bash scripts/build.sh ${{ matrix.build }}
+
+      - name: Verify binary exists
+        run: test -x build/seedmix

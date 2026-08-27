@@ -83,5 +83,5 @@ echo "Building…"
 cmake --build . -- -j"$(nproc)"
 
 echo ""
-echo "✅ Build complete: ${BUILD_DIR}/esp32_entropy"
-echo "   Run it:  ${BUILD_DIR}/esp32_entropy"
+echo "✅ Build complete: ${BUILD_DIR}/seedmix"
+echo "   Run it:  ${BUILD_DIR}/seedmix"

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(esp32_entropy VERSION 0.1.0 LANGUAGES C)
+project(seedmix VERSION 0.1.0 LANGUAGES C)
 
 option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
 
