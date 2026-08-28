@@ -20,6 +20,9 @@ static lv_obj_t* entered_ta = NULL;
 static char      entered_buf[512];
 static lv_obj_t* prev_screen = NULL; // track for deferred cleanup
 
+static lv_obj_t*      camera_img = NULL; // live camera feed image widget
+static lv_image_dsc_t camera_dsc;        // descriptor backing the live feed
+
 // Recursively zero the text of every label under `obj`.  lv_label_set_text()
 // copies strings into LVGL-allocated memory; freeing the object does NOT wipe
 // those copies, so mnemonic words and entropy hex would linger in the heap.
@@ -246,58 +249,22 @@ void ui_show_other_source(ui_cb_t on_camera, ui_cb_t on_scan_qr, ui_cb_t on_dice
     ui_swap_screen(s);
 }
 
-void ui_show_camera_image(const uint8_t* rgb565, uint32_t w, uint32_t h, ui_cb_t on_use,
-                          ui_cb_t on_retake, ui_cb_t on_back) {
-    ASSERT_OR_DIE(rgb565, "null rgb565");
-    ASSERT_OR_DIE(w > 0 && h > 0, "invalid camera image size");
+void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel) {
     ASSERT_OR_DIE(on_use, "null on_use");
-    ASSERT_OR_DIE(on_retake, "null on_retake");
-    ASSERT_OR_DIE(on_back, "null on_back");
+    ASSERT_OR_DIE(on_cancel, "null on_cancel");
 
     lv_obj_t* s = ui_make_screen();
-    ui_add_title(s, "Camera Image");
+    ui_add_title(s, "Camera");
 
-    static lv_image_dsc_t dsc;
-    memset(&dsc, 0, sizeof(dsc));
-    dsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
-    dsc.header.cf     = LV_COLOR_FORMAT_RGB565;
-    dsc.header.w      = (uint16_t)w;
-    dsc.header.h      = (uint16_t)h;
-    dsc.header.stride = (uint16_t)(w * 2);
-    dsc.data_size     = w * h * 2;
-    dsc.data          = rgb565;
+    memset(&camera_dsc, 0, sizeof(camera_dsc));
+    camera_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    camera_dsc.header.cf    = LV_COLOR_FORMAT_RGB565;
 
-    lv_obj_t* img = lv_image_create(s);
-    lv_image_set_src(img, &dsc);
+    camera_img = lv_image_create(s);
+    lv_obj_set_size(camera_img, 300, 200);
+    lv_obj_align(camera_img, LV_ALIGN_TOP_MID, 0, 45);
 
-    /* Fit the image into a 300x200 area, preserving the aspect ratio. */
-    uint32_t disp_w = w, disp_h = h;
-    if (w > 300 || h > 200) {
-        uint32_t zx = (256 * 300) / w;
-        uint32_t zy = (256 * 200) / h;
-        uint32_t z  = (zx < zy) ? zx : zy;
-        disp_w      = (w * z) / 256;
-        disp_h      = (h * z) / 256;
-    }
-    lv_obj_set_size(img, disp_w, disp_h);
-    lv_image_set_inner_align(img, LV_IMAGE_ALIGN_STRETCH);
-    lv_obj_align(img, LV_ALIGN_TOP_MID, 0, 45);
-
-    /* back button (top-left) */
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } ub               = {.fn = on_back};
-    lv_obj_t* back_btn = lv_button_create(s);
-    lv_obj_set_size(back_btn, 70, 30);
-    lv_obj_align(back_btn, LV_ALIGN_TOP_LEFT, 10, 10);
-    lv_obj_add_event_cb(back_btn, ui_btn_invoke, LV_EVENT_CLICKED, ub.vp);
-    lv_obj_t* back_lbl = lv_label_create(back_btn);
-    lv_label_set_text(back_lbl, "Back");
-    lv_obj_set_style_text_font(back_lbl, &lv_font_montserrat_14, 0);
-    lv_obj_center(back_lbl);
-
-    /* "Use Image" (left) and "Get Another" (right). */
+    /* "Use Image" (left) and "Cancel" (right). */
     union {
         ui_cb_t fn;
         void*   vp;
@@ -314,17 +281,45 @@ void ui_show_camera_image(const uint8_t* rgb565, uint32_t w, uint32_t h, ui_cb_t
     union {
         ui_cb_t fn;
         void*   vp;
-    } u_retake           = {.fn = on_retake};
-    lv_obj_t* retake_btn = lv_button_create(s);
-    lv_obj_set_size(retake_btn, 180, 55);
-    lv_obj_align(retake_btn, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
-    lv_obj_add_event_cb(retake_btn, ui_btn_invoke, LV_EVENT_CLICKED, u_retake.vp);
-    lv_obj_t* retake_lbl = lv_label_create(retake_btn);
-    lv_label_set_text(retake_lbl, "Get Another");
-    lv_obj_set_style_text_font(retake_lbl, &lv_font_montserrat_24, 0);
-    lv_obj_center(retake_lbl);
+    } u_cancel           = {.fn = on_cancel};
+    lv_obj_t* cancel_btn = lv_button_create(s);
+    lv_obj_set_size(cancel_btn, 180, 55);
+    lv_obj_align(cancel_btn, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
+    lv_obj_add_event_cb(cancel_btn, ui_btn_invoke, LV_EVENT_CLICKED, u_cancel.vp);
+    lv_obj_t* cancel_lbl = lv_label_create(cancel_btn);
+    lv_label_set_text(cancel_lbl, "Cancel");
+    lv_obj_set_style_text_font(cancel_lbl, &lv_font_montserrat_24, 0);
+    lv_obj_center(cancel_lbl);
 
     ui_swap_screen(s);
+}
+
+void ui_camera_feed_update(const uint8_t* rgb565, uint32_t w, uint32_t h) {
+    if (!camera_img) return;
+    ASSERT_OR_DIE(rgb565, "null rgb565");
+    ASSERT_OR_DIE(w > 0 && h > 0, "invalid camera frame size");
+
+    // Fit the frame into the 300x200 preview area, preserving aspect ratio
+    uint32_t disp_w = w, disp_h = h;
+    if (w > 300 || h > 200) {
+        uint32_t zx = (256 * 300) / w;
+        uint32_t zy = (256 * 200) / h;
+        uint32_t z  = (zx < zy) ? zx : zy;
+        disp_w      = (w * z) / 256;
+        disp_h      = (h * z) / 256;
+    }
+    lv_obj_set_size(camera_img, disp_w, disp_h);
+
+    camera_dsc.header.w      = (uint16_t)w;
+    camera_dsc.header.h      = (uint16_t)h;
+    camera_dsc.header.stride = (uint16_t)(w * 2);
+    camera_dsc.data_size     = w * h * 2;
+    camera_dsc.data          = rgb565;
+
+    // Set the source first so the image has valid dimensions, then apply the
+    // stretch alignment
+    lv_image_set_src(camera_img, &camera_dsc);
+    lv_image_set_inner_align(camera_img, LV_IMAGE_ALIGN_STRETCH);
 }
 
 void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok) {

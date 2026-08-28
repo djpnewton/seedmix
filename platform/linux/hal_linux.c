@@ -85,30 +85,41 @@ static hal_camera_pixfmt_t map_pixfmt(uint32_t v4l2_fmt) {
     }
 }
 
-/**
- * @brief Capture one frame from the V4L2 device into @p out.
- * @return true on success; false on any capture failure.
- */
-static bool v4l2_capture_frame(hal_camera_frame_t* out) {
+/** Streaming camera session (opaque). */
+struct hal_camera {
+    int                   fd;
+    struct v4l2_mmap_buf* bufs;
+    uint32_t              n_mapped;
+    uint32_t              width;
+    uint32_t              height;
+    uint32_t              bytes_per_line;
+    uint32_t              pixelformat;
+    hal_camera_pixfmt_t   pixfmt;
+};
+
+hal_camera_t* hal_camera_open(void) {
     const char* dev = camera_device();
 
-    uint8_t*              frame     = NULL;
-    size_t                frame_len = 0;
-    struct v4l2_mmap_buf* bufs      = NULL;
-    uint32_t              n_mapped  = 0;
+    hal_camera_t* cam = calloc(1, sizeof(*cam));
+    if (!cam) {
+        LOG_ERROR("out of memory");
+        return NULL;
+    }
+    cam->fd = -1;
 
-    int fd = open(dev, O_RDWR);
-    if (fd < 0) {
+    cam->fd = open(dev, O_RDWR);
+    if (cam->fd < 0) {
         LOG_ERROR("failed to open %s: %s", dev, strerror(errno));
-        return false;
+        free(cam);
+        return NULL;
     }
 
     struct v4l2_capability cap;
-    if (xioctl(fd, VIDIOC_QUERYCAP, &cap) == -1 || !(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) ||
-        !(cap.capabilities & V4L2_CAP_STREAMING)) {
+    if (xioctl(cam->fd, VIDIOC_QUERYCAP, &cap) == -1 ||
+        !(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) || !(cap.capabilities & V4L2_CAP_STREAMING)) {
         LOG_ERROR("%s is not a streaming capture device", dev);
-        close(fd);
-        return false;
+        hal_camera_close(cam);
+        return NULL;
     }
 
     /* Prefer YUYV; fall back to MJPEG if the device doesn't support it. */
@@ -119,38 +130,42 @@ static bool v4l2_capture_frame(hal_camera_frame_t* out) {
     fmt.fmt.pix.height      = 480;
     fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
     fmt.fmt.pix.field       = V4L2_FIELD_ANY;
-    if (xioctl(fd, VIDIOC_S_FMT, &fmt) == -1) {
+    if (xioctl(cam->fd, VIDIOC_S_FMT, &fmt) == -1) {
         fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
-        if (xioctl(fd, VIDIOC_S_FMT, &fmt) == -1) {
+        if (xioctl(cam->fd, VIDIOC_S_FMT, &fmt) == -1) {
             LOG_ERROR("failed to set capture format on %s", dev);
-            close(fd);
-            return false;
+            hal_camera_close(cam);
+            return NULL;
         }
     }
 
-    LOG_INFO("camera %s format %ux%u fourcc '%c%c%c%c' stride=%u sizeimage=%u", dev,
-             fmt.fmt.pix.width, fmt.fmt.pix.height, (char)(fmt.fmt.pix.pixelformat & 0xff),
-             (char)((fmt.fmt.pix.pixelformat >> 8) & 0xff),
-             (char)((fmt.fmt.pix.pixelformat >> 16) & 0xff),
-             (char)((fmt.fmt.pix.pixelformat >> 24) & 0xff), fmt.fmt.pix.bytesperline,
-             fmt.fmt.pix.sizeimage);
+    cam->width          = fmt.fmt.pix.width;
+    cam->height         = fmt.fmt.pix.height;
+    cam->bytes_per_line = fmt.fmt.pix.bytesperline;
+    cam->pixelformat    = fmt.fmt.pix.pixelformat;
+    cam->pixfmt         = map_pixfmt(fmt.fmt.pix.pixelformat);
+
+    LOG_INFO("camera %s format %ux%u fourcc '%c%c%c%c' stride=%u sizeimage=%u", dev, cam->width,
+             cam->height, (char)(cam->pixelformat & 0xff), (char)((cam->pixelformat >> 8) & 0xff),
+             (char)((cam->pixelformat >> 16) & 0xff), (char)((cam->pixelformat >> 24) & 0xff),
+             cam->bytes_per_line, fmt.fmt.pix.sizeimage);
 
     struct v4l2_requestbuffers req;
     memset(&req, 0, sizeof(req));
     req.count  = 4;
     req.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     req.memory = V4L2_MEMORY_MMAP;
-    if (xioctl(fd, VIDIOC_REQBUFS, &req) == -1 || req.count < 2) {
+    if (xioctl(cam->fd, VIDIOC_REQBUFS, &req) == -1 || req.count < 2) {
         LOG_ERROR("failed to request buffers on %s", dev);
-        close(fd);
-        return false;
+        hal_camera_close(cam);
+        return NULL;
     }
 
-    bufs = calloc(req.count, sizeof(*bufs));
-    if (!bufs) {
+    cam->bufs = calloc(req.count, sizeof(*cam->bufs));
+    if (!cam->bufs) {
         LOG_ERROR("out of memory");
-        close(fd);
-        return false;
+        hal_camera_close(cam);
+        return NULL;
     }
 
     for (uint32_t i = 0; i < req.count; i++) {
@@ -159,12 +174,19 @@ static bool v4l2_capture_frame(hal_camera_frame_t* out) {
         vb.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vb.memory = V4L2_MEMORY_MMAP;
         vb.index  = i;
-        if (xioctl(fd, VIDIOC_QUERYBUF, &vb) == -1) goto cleanup;
+        if (xioctl(cam->fd, VIDIOC_QUERYBUF, &vb) == -1) {
+            hal_camera_close(cam);
+            return NULL;
+        }
 
-        bufs[i].length = vb.length;
-        bufs[i].start  = mmap(NULL, vb.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, vb.m.offset);
-        if (bufs[i].start == MAP_FAILED) goto cleanup;
-        n_mapped++;
+        cam->bufs[i].length = vb.length;
+        cam->bufs[i].start =
+            mmap(NULL, vb.length, PROT_READ | PROT_WRITE, MAP_SHARED, cam->fd, vb.m.offset);
+        if (cam->bufs[i].start == MAP_FAILED) {
+            hal_camera_close(cam);
+            return NULL;
+        }
+        cam->n_mapped++;
     }
 
     for (uint32_t i = 0; i < req.count; i++) {
@@ -173,65 +195,71 @@ static bool v4l2_capture_frame(hal_camera_frame_t* out) {
         vb.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         vb.memory = V4L2_MEMORY_MMAP;
         vb.index  = i;
-        if (xioctl(fd, VIDIOC_QBUF, &vb) == -1) goto cleanup;
+        if (xioctl(cam->fd, VIDIOC_QBUF, &vb) == -1) {
+            hal_camera_close(cam);
+            return NULL;
+        }
     }
 
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (xioctl(fd, VIDIOC_STREAMON, &type) == -1) goto cleanup;
-
-    /* Dequeue a single frame, waiting up to ~10s for the device. */
-    for (unsigned attempt = 0; attempt < 5 && !frame; attempt++) {
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(fd, &fds);
-        struct timeval tv = {2, 0};
-
-        int r = select(fd + 1, &fds, NULL, NULL, &tv);
-        if (r <= 0) continue; /* timeout or interrupted */
-
-        struct v4l2_buffer vb;
-        memset(&vb, 0, sizeof(vb));
-        vb.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        vb.memory = V4L2_MEMORY_MMAP;
-        if (xioctl(fd, VIDIOC_DQBUF, &vb) == -1) continue;
-
-        frame_len = vb.bytesused;
-        frame     = malloc(frame_len);
-        if (!frame) {
-            xioctl(fd, VIDIOC_QBUF, &vb);
-            break;
-        }
-        memcpy(frame, bufs[vb.index].start, frame_len);
-        xioctl(fd, VIDIOC_QBUF, &vb);
+    if (xioctl(cam->fd, VIDIOC_STREAMON, &type) == -1) {
+        hal_camera_close(cam);
+        return NULL;
     }
 
-    xioctl(fd, VIDIOC_STREAMOFF, &type);
+    return cam;
+}
 
-cleanup:
-    for (uint32_t i = 0; i < n_mapped; i++) {
-        munmap(bufs[i].start, bufs[i].length);
+bool hal_camera_grab(hal_camera_t* cam, hal_camera_frame_t* out) {
+    if (!cam) return false;
+    ASSERT_OR_DIE(out, "hal_camera_grab: null frame");
+    memset(out, 0, sizeof(*out));
+
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(cam->fd, &fds);
+    struct timeval tv = {2, 0};
+
+    if (select(cam->fd + 1, &fds, NULL, NULL, &tv) <= 0) {
+        return false; /* timeout or interrupted */
     }
-    free(bufs);
-    close(fd);
 
+    struct v4l2_buffer vb;
+    memset(&vb, 0, sizeof(vb));
+    vb.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    vb.memory = V4L2_MEMORY_MMAP;
+    if (xioctl(cam->fd, VIDIOC_DQBUF, &vb) == -1) return false;
+
+    size_t   frame_len = vb.bytesused;
+    uint8_t* frame     = malloc(frame_len ? frame_len : 1);
     if (!frame) {
-        LOG_ERROR("failed to capture a frame from %s", dev);
+        xioctl(cam->fd, VIDIOC_QBUF, &vb);
         return false;
     }
+    memcpy(frame, cam->bufs[vb.index].start, frame_len);
+    xioctl(cam->fd, VIDIOC_QBUF, &vb);
 
     out->data           = frame;
     out->size           = frame_len;
-    out->width          = fmt.fmt.pix.width;
-    out->height         = fmt.fmt.pix.height;
-    out->bytes_per_line = fmt.fmt.pix.bytesperline;
-    out->pixfmt         = map_pixfmt(fmt.fmt.pix.pixelformat);
+    out->width          = cam->width;
+    out->height         = cam->height;
+    out->bytes_per_line = cam->bytes_per_line;
+    out->pixfmt         = cam->pixfmt;
     return true;
 }
 
-bool hal_camera_capture(hal_camera_frame_t* frame) {
-    ASSERT_OR_DIE(frame, "hal_camera_capture: null frame");
-    memset(frame, 0, sizeof(*frame));
-    return v4l2_capture_frame(frame);
+void hal_camera_close(hal_camera_t* cam) {
+    if (!cam) return;
+    if (cam->fd >= 0) {
+        enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        xioctl(cam->fd, VIDIOC_STREAMOFF, &type);
+    }
+    for (uint32_t i = 0; i < cam->n_mapped; i++) {
+        munmap(cam->bufs[i].start, cam->bufs[i].length);
+    }
+    free(cam->bufs);
+    if (cam->fd >= 0) close(cam->fd);
+    free(cam);
 }
 
 void hal_camera_frame_free(hal_camera_frame_t* frame) {

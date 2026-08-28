@@ -26,8 +26,7 @@ static unsigned    word_count = 12;
 static void on_other_source(void);
 static void on_camera_image(void);
 static void on_camera_use(void);
-static void on_camera_retake(void);
-static void on_camera_back(void);
+static void on_camera_cancel(void);
 static void on_scan_qr(void);
 static void on_dice_rolls(void);
 static void on_coin_flips(void);
@@ -140,9 +139,11 @@ static void on_other_source(void) {
 }
 
 /* -- Camera image source --------------------------------------------- */
-static hal_camera_frame_t camera_frame;  /* current captured frame (owned) */
-static uint8_t*           camera_rgb565; /* RGB565 preview buffer (owned) */
+static hal_camera_t*      camera = NULL; /* open streaming session */
+static hal_camera_frame_t camera_frame;  /* latest captured frame (owned) */
+static uint8_t*           camera_rgb565; /* RGB565 preview buffer (owned, reused) */
 static uint32_t           camera_w = 0, camera_h = 0;
+static lv_timer_t*        camera_timer = NULL; /* live feed timer */
 
 static inline uint8_t clip8(int v) { return (uint8_t)(v < 0 ? 0 : (v > 255 ? 255 : v)); }
 
@@ -166,11 +167,9 @@ static void camera_release(void) {
     camera_w = camera_h = 0;
 }
 
-static uint8_t* camera_frame_to_rgb565(const hal_camera_frame_t* f, uint32_t* out_w,
-                                       uint32_t* out_h) {
+static void camera_frame_to_rgb565(const hal_camera_frame_t* f, uint8_t* rgb) {
     ASSERT_OR_DIE(f && f->data && f->width > 0 && f->height > 0, "invalid camera frame");
-    *out_w = f->width;
-    *out_h = f->height;
+    ASSERT_OR_DIE(rgb, "null camera preview buffer");
 
     uint32_t bpp;
     switch (f->pixfmt) {
@@ -188,9 +187,6 @@ static uint8_t* camera_frame_to_rgb565(const hal_camera_frame_t* f, uint32_t* ou
         break;
     }
 
-    size_t   n   = (size_t)f->width * f->height;
-    uint8_t* rgb = (uint8_t*)calloc(n, 2);
-    ASSERT_OR_DIE(rgb, "out of memory converting camera frame");
     uint16_t* dst    = (uint16_t*)rgb;
     uint32_t  stride = f->bytes_per_line ? f->bytes_per_line : f->width * bpp;
 
@@ -224,11 +220,9 @@ static uint8_t* camera_frame_to_rgb565(const hal_camera_frame_t* f, uint32_t* ou
     case HAL_CAMERA_FMT_JPEG:
     case HAL_CAMERA_FMT_UNKNOWN:
     default:
-        free(rgb);
         FATAL("Unsupported camera pixel format.");
-        return NULL;
+        break;
     }
-    return rgb;
 }
 
 static const char* camera_pixfmt_name(hal_camera_pixfmt_t f) {
@@ -246,41 +240,84 @@ static const char* camera_pixfmt_name(hal_camera_pixfmt_t f) {
     }
 }
 
-static void camera_capture_and_preview(void) {
-    ui_show_msg("Getting camera image...");
-    ui_delay_ms(300);
+static void camera_feed_tick(lv_timer_t* t) {
+    (void)t;
 
-    if (!hal_camera_capture(&camera_frame)) {
-        FATAL("Failed to capture camera image.");
+    hal_camera_frame_t next;
+    memset(&next, 0, sizeof(next));
+    if (!hal_camera_grab(camera, &next)) {
+        return; /* keep showing the previous frame */
     }
+
+    hal_camera_frame_free(&camera_frame);
+    camera_frame = next;
 
     LOG_INFO("camera frame: %ux%u pixfmt=%s size=%zu bytes_per_line=%u", camera_frame.width,
              camera_frame.height, camera_pixfmt_name(camera_frame.pixfmt), camera_frame.size,
              camera_frame.bytes_per_line);
 
-    camera_rgb565 = camera_frame_to_rgb565(&camera_frame, &camera_w, &camera_h);
-    ui_show_camera_image(camera_rgb565, camera_w, camera_h, on_camera_use, on_camera_retake,
-                         on_camera_back);
+    if (camera_frame.width != camera_w || camera_frame.height != camera_h) {
+        /* dimensions changed - drop the stale preview buffer */
+        if (camera_rgb565) {
+            secure_memzero(camera_rgb565, (size_t)camera_w * camera_h * 2);
+            free(camera_rgb565);
+            camera_rgb565 = NULL;
+        }
+        camera_w = camera_frame.width;
+        camera_h = camera_frame.height;
+    }
+
+    if (!camera_rgb565) {
+        camera_rgb565 = calloc((size_t)camera_w * camera_h, 2);
+        ASSERT_OR_DIE(camera_rgb565, "out of memory for camera preview");
+    }
+
+    camera_frame_to_rgb565(&camera_frame, camera_rgb565);
+    ui_camera_feed_update(camera_rgb565, camera_w, camera_h);
+}
+
+static void camera_feed_stop(void) {
+    if (camera_timer) {
+        lv_timer_delete(camera_timer);
+        camera_timer = NULL;
+    }
+    if (camera) {
+        hal_camera_close(camera);
+        camera = NULL;
+    }
+    camera_release();
 }
 
 static void on_camera_image(void) {
     if (!hal_camera_available()) {
         FATAL("Camera not available.");
     }
-    camera_capture_and_preview();
+    camera = hal_camera_open();
+    ASSERT_OR_DIE(camera, "Failed to open camera.");
+    ui_show_camera_feed(on_camera_use, on_camera_cancel);
+    camera_timer = lv_timer_create(camera_feed_tick, 120, NULL);
 }
 
-static void on_camera_retake(void) {
-    camera_release();
-    camera_capture_and_preview();
-}
-
-static void on_camera_back(void) {
-    camera_release();
+static void on_camera_cancel(void) {
+    camera_feed_stop();
     ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, go_source);
 }
 
 static void on_camera_use(void) {
+    /* Stop the feed and close the camera; the last grabbed frame stays valid. */
+    if (camera_timer) {
+        lv_timer_delete(camera_timer);
+        camera_timer = NULL;
+    }
+    if (camera) {
+        hal_camera_close(camera);
+        camera = NULL;
+    }
+
+    if (!camera_frame.data) {
+        FATAL("No camera image captured yet.");
+    }
+
     /* Derive entropy (16 or 32 bytes) from the raw camera bytes. */
     size_t  elen = (word_count == 24) ? 32 : 16;
     uint8_t entropy[32];

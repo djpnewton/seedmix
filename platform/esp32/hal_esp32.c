@@ -19,11 +19,15 @@ void hal_get_random(uint8_t* buf, size_t len) {
 
 bool hal_camera_available(void) { return false; }
 
-bool hal_camera_capture(hal_camera_frame_t* frame) {
-    ASSERT_OR_DIE(frame, "hal_camera_capture: null frame");
-    memset(frame, 0, sizeof(*frame));
-    return false; /* camera not implemented on ESP32 yet */
+hal_camera_t* hal_camera_open(void) { return NULL; /* camera not implemented on ESP32 yet */ }
+
+bool hal_camera_grab(hal_camera_t* cam, hal_camera_frame_t* out) {
+    (void)cam;
+    (void)out;
+    return false;
 }
+
+void hal_camera_close(hal_camera_t* cam) { (void)cam; }
 
 void hal_camera_frame_free(hal_camera_frame_t* frame) {
     if (!frame) return;

@@ -35,7 +35,7 @@ const char* hal_get_random_source();
 void hal_get_random(uint8_t* buf, size_t len);
 
 /**
- * @brief Pixel formats that hal_camera_capture() may return.
+ * @brief Pixel formats that hal_camera_grab() may return.
  */
 typedef enum {
     HAL_CAMERA_FMT_UNKNOWN = 0, /**< Unrecognized format. */
@@ -61,6 +61,14 @@ typedef struct {
 } hal_camera_frame_t;
 
 /**
+ * @brief An open, streaming camera session (opaque).
+ *
+ * Returned by hal_camera_open(), frames are dequeued with hal_camera_grab()
+ * and the session is released with hal_camera_close().
+ */
+typedef struct hal_camera hal_camera_t;
+
+/**
  * @brief Check whether a camera source is available.
  *
  * On Linux this probes a Video4Linux2 capture device (default /dev/video0,
@@ -71,19 +79,37 @@ typedef struct {
 bool hal_camera_available(void);
 
 /**
- * @brief Capture one frame from the camera.
+ * @brief Open the camera and start streaming.
  *
- * On success the frame's `data` buffer is allocated and must be released
- * with hal_camera_frame_free().  On failure (e.g. no camera present or a
- * timeout) returns false and leaves the frame untouched.
+ * Configures the capture format and starts the device streaming
  *
- * @param frame  Output frame (must not be NULL).
- * @return true if a frame was captured.
+ * @return An open camera session, or NULL if the camera could not be opened.
  */
-bool hal_camera_capture(hal_camera_frame_t* frame);
+hal_camera_t* hal_camera_open(void);
 
 /**
- * @brief Release a frame captured with hal_camera_capture().
+ * @brief Dequeue the next frame from a streaming camera.
+ *
+ * Blocks until a frame is available or a timeout elapses.  On success the
+ * frame's `data` buffer is allocated and must be released with
+ * hal_camera_frame_free().  On failure returns false and leaves @p out
+ * untouched.
+ *
+ * @param cam  Open camera session (from hal_camera_open()).
+ * @param out  Output frame (must not be NULL).
+ * @return true if a frame was captured.
+ */
+bool hal_camera_grab(hal_camera_t* cam, hal_camera_frame_t* out);
+
+/**
+ * @brief Stop streaming and release a camera session.
+ *
+ * @param cam  Camera session to release (may be NULL).
+ */
+void hal_camera_close(hal_camera_t* cam);
+
+/**
+ * @brief Release a frame dequeued with hal_camera_grab().
  *
  * Zeroes and frees `frame->data` and resets the struct.
  */

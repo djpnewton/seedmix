@@ -27,8 +27,8 @@ void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_other_sour
                     ui_cb_t on_state, ui_cb_t on_finish, bool is_additional);
 void ui_show_other_source(ui_cb_t on_camera, ui_cb_t on_scan_qr, ui_cb_t on_dice, ui_cb_t on_coins,
                           ui_cb_t on_back);
-void ui_show_camera_image(const uint8_t* rgb565, uint32_t w, uint32_t h, ui_cb_t on_use,
-                          ui_cb_t on_retake, ui_cb_t on_back);
+void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel);
+void ui_camera_feed_update(const uint8_t* rgb565, uint32_t w, uint32_t h);
 
 /** @deprecated Use ui_word_entry_begin from word_entry.h instead. */
 void        ui_show_enter_words(ui_cb_t on_ok);
