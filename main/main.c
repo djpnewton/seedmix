@@ -4,6 +4,8 @@
  */
 
 #include "app.h"
+#include "crypto/coin.h"
+#include "crypto/dice.h"
 #include "crypto/mnemonic.h"
 #include "crypto/touch.h"
 #include "hal.h"
@@ -342,9 +344,107 @@ static void on_camera_use(void) {
 
 static void on_scan_qr(void) { FATAL("Scan QR not yet implemented."); }
 
-static void on_dice_rolls(void) { FATAL("Dice rolls not yet implemented."); }
+/* -- Dice roll entropy source ---------------------------------------- */
+static dice_entropy_t* dice = NULL;
 
-static void on_coin_flips(void) { FATAL("Coin flips not yet implemented."); }
+static void on_dice_roll(uint8_t value) {
+    ASSERT_OR_DIE(dice, "no active dice session");
+    dice_entropy_add_roll(dice, value);
+
+    if (!dice_entropy_ready(dice)) {
+        char status[64];
+        int  res =
+            snprintf(status, sizeof(status), "Entropy: %u / %u bits (%u rolls)",
+                     dice_entropy_bits(dice), dice_entropy_needed(dice), dice_entropy_rolls(dice));
+        ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(status), "status string too long");
+        ui_dice_set_status(status);
+        return;
+    }
+
+    unsigned rolls = dice_entropy_rolls(dice);
+    unsigned sides = dice_entropy_sides(dice);
+    uint8_t  entropy[32];
+    size_t   elen = dice_entropy_derive(dice, entropy, sizeof(entropy));
+    ASSERT_OR_DIE(elen == 16 || elen == 32, "unexpected entropy length");
+    mnemonic_t* m = mnemonic_from_entropy(entropy, elen);
+    secure_memzero(entropy, sizeof(entropy));
+    dice_entropy_discard(dice);
+    dice = NULL;
+
+    char desc[48];
+    int res = snprintf(desc, sizeof(desc), "d%u dice %u-word (%u rolls)", sides, word_count, rolls);
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
+    merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
+}
+
+static void on_dice_cancel(void) {
+    if (dice) {
+        dice_entropy_discard(dice);
+        dice = NULL;
+    }
+    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, on_touch_screen,
+                         go_source);
+}
+
+static void on_dice_sides_chosen(uint8_t sides) {
+    ASSERT_OR_DIE(!dice, "dice session already active");
+    dice = dice_entropy_begin(word_count, sides);
+    ui_show_dice(sides, on_dice_roll, on_dice_cancel);
+}
+
+static void on_dice_sides_cancel(void) {
+    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, on_touch_screen,
+                         go_source);
+}
+
+static void on_dice_rolls(void) { ui_show_dice_sides(on_dice_sides_chosen, on_dice_sides_cancel); }
+
+/* -- Coin flip entropy source ---------------------------------------- */
+static coin_entropy_t* coin = NULL;
+
+static void on_coin_flip(uint8_t value) {
+    ASSERT_OR_DIE(coin, "no active coin session");
+    coin_entropy_add_flip(coin, value);
+
+    if (!coin_entropy_ready(coin)) {
+        char status[64];
+        int  res =
+            snprintf(status, sizeof(status), "Entropy: %u / %u bits (%u flips)",
+                     coin_entropy_bits(coin), coin_entropy_needed(coin), coin_entropy_flips(coin));
+        ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(status), "status string too long");
+        ui_coin_set_status(status);
+        return;
+    }
+
+    unsigned flips = coin_entropy_flips(coin);
+    uint8_t  entropy[32];
+    size_t   elen = coin_entropy_derive(coin, entropy, sizeof(entropy));
+    ASSERT_OR_DIE(elen == 16 || elen == 32, "unexpected entropy length");
+    mnemonic_t* m = mnemonic_from_entropy(entropy, elen);
+    secure_memzero(entropy, sizeof(entropy));
+    coin_entropy_discard(coin);
+    coin = NULL;
+
+    char desc[48];
+    int  res = snprintf(desc, sizeof(desc), "coin flips %u-word (%u flips)", word_count, flips);
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
+    merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
+}
+
+static void on_coin_cancel(void) {
+    if (coin) {
+        coin_entropy_discard(coin);
+        coin = NULL;
+    }
+    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, on_touch_screen,
+                         go_source);
+}
+
+static void on_coin_flips(void) {
+    ASSERT_OR_DIE(!coin, "coin session already active");
+    coin = coin_entropy_begin(word_count);
+    ui_show_coin(on_coin_flip, on_coin_cancel);
+}
 
 /* -- Touch screen entropy source -------------------------------------- */
 static touch_entropy_t* touch = NULL;

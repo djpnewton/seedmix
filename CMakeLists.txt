@@ -24,6 +24,8 @@ set(COMMON_SOURCES
     main/ui/log.c
     main/crypto/mnemonic.c
     main/crypto/touch.c
+    main/crypto/dice.c
+    main/crypto/coin.c
     main/crypto/secure_stack.c
     main/crypto/bip39_wordlist.c
     main/util/error.c

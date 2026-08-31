@@ -26,13 +26,6 @@ struct mnemonic_t {
     size_t          entropy_len; /* 16 or 32 */
 };
 
-static bool word_count_valid(unsigned wc) { return wc == 12 || wc == 24; }
-
-static size_t word_count_to_bytes(unsigned wc) {
-    ASSERT_OR_DIE(word_count_valid(wc), "word count not valid");
-    return wc == 12 ? 16 : 32;
-}
-
 static size_t entropy_len_valid(size_t len) { return len == 16 || len == 32; }
 
 static mnemonic_t* mnemonic_alloc(char* words, size_t entropy_len) {
@@ -69,7 +62,7 @@ size_t mnemonic_entropy_size(const mnemonic_t* m) { return m ? m->entropy_len : 
 
 mnemonic_t* mnemonic_generate(unsigned word_count, mnemonic_process_cb_t process_cb) {
     ASSERT_OR_DIE(process_cb, "process callback is required");
-    size_t entropy_len = word_count_to_bytes(word_count);
+    size_t entropy_len = utils_word_count_bytes(word_count);
     ASSERT_OR_DIE(entropy_len <= MAX_ENTROPY_BYTES, "entropy length too large");
 
     uint8_t entropy[MAX_ENTROPY_BYTES] = {0};

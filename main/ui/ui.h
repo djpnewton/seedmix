@@ -14,6 +14,7 @@ extern "C" {
 
 typedef void (*ui_cb_t)(void);
 typedef void (*ui_tap_cb_t)(lv_coord_t x, lv_coord_t y);
+typedef void (*ui_uint_cb_t)(uint8_t value);
 
 #define UI_COLOR_SEED_GREEN 0xA6CF5E // light green
 #define UI_COLOR_MIX_GREEN 0x305C2B  // dark green
@@ -35,6 +36,11 @@ void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel);
 void ui_camera_feed_update(const uint8_t* rgb565, uint32_t w, uint32_t h);
 void ui_show_touch_screen(ui_tap_cb_t on_tap, ui_cb_t on_cancel);
 void ui_touch_screen_set_status(const char* text);
+void ui_show_dice_sides(ui_uint_cb_t on_sides, ui_cb_t on_back);
+void ui_show_dice(unsigned sides, ui_uint_cb_t on_roll, ui_cb_t on_cancel);
+void ui_dice_set_status(const char* text);
+void ui_show_coin(ui_uint_cb_t on_flip, ui_cb_t on_cancel);
+void ui_coin_set_status(const char* text);
 
 /** @deprecated Use ui_word_entry_begin from word_entry.h instead. */
 void        ui_show_enter_words(ui_cb_t on_ok);

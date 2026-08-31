@@ -68,3 +68,22 @@ void sha256_expand(const uint8_t* data, size_t data_len, uint8_t* out, size_t ou
 
     secure_memzero(seed, sizeof(seed));
 }
+
+bool utils_word_count_valid(unsigned wc) { return wc == 12 || wc == 24; }
+
+unsigned utils_word_count_bits(unsigned wc) {
+    ASSERT_OR_DIE(utils_word_count_valid(wc), "word count not valid");
+    return wc == 12 ? 128 : 256;
+}
+
+size_t utils_word_count_bytes(unsigned wc) {
+    ASSERT_OR_DIE(utils_word_count_valid(wc), "word count not valid");
+    return wc == 12 ? 16 : 32;
+}
+
+unsigned utils_floor_log2(uint64_t v) {
+    ASSERT_OR_DIE(v > 0, "floor_log2: value must be > 0");
+    unsigned bits = 0;
+    for (; v > 1; v >>= 1) bits++;
+    return bits;
+}
