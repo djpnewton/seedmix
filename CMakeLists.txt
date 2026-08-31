@@ -23,6 +23,7 @@ set(COMMON_SOURCES
     main/ui/mnemonic_view.c
     main/ui/log.c
     main/crypto/mnemonic.c
+    main/crypto/touch.c
     main/crypto/secure_stack.c
     main/crypto/bip39_wordlist.c
     main/util/error.c

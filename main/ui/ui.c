@@ -241,24 +241,102 @@ void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_other_sour
 }
 
 void ui_show_other_source(ui_cb_t on_camera, ui_cb_t on_scan_qr, ui_cb_t on_dice, ui_cb_t on_coins,
-                          ui_cb_t on_back) {
+                          ui_cb_t on_touch, ui_cb_t on_back) {
     ASSERT_OR_DIE(on_camera, "null on_camera");
     ASSERT_OR_DIE(on_scan_qr, "null on_scan_qr");
     ASSERT_OR_DIE(on_dice, "null on_dice");
     ASSERT_OR_DIE(on_coins, "null on_coins");
+    ASSERT_OR_DIE(on_touch, "null on_touch");
     ASSERT_OR_DIE(on_back, "null on_back");
 
     lv_obj_t* s = ui_make_screen();
     ui_add_title(s, "Other Sources");
-    ui_add_btn(s, "Camera Image", on_camera, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -82);
-    ui_add_btn(s, "Scan QR", on_scan_qr, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -28);
-    ui_add_btn(s, "Dice Rolls", on_dice, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 26);
-    ui_add_btn(s, "Coin Flips", on_coins, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 80);
+    ui_add_btn(s, "Camera Image", on_camera, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -86);
+    ui_add_btn(s, "Scan QR", on_scan_qr, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -34);
+    ui_add_btn(s, "Dice Rolls", on_dice, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 18);
+    ui_add_btn(s, "Coin Flips", on_coins, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 70);
+    ui_add_btn(s, "Touch Screen", on_touch, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 122);
 
     /* back button (bottom-right) */
     ui_add_btn(s, "Back", on_back, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
     ui_swap_screen(s);
+}
+
+/* -- Touch screen entropy --------------------------------------------- */
+static lv_obj_t* touch_status = NULL;
+
+static void touch_status_delete_cb(lv_event_t* e) {
+    (void)e;
+    touch_status = NULL; // invalidate the pointer when the label is deleted
+}
+
+static void touch_area_tap_cb(lv_event_t* e) {
+    union {
+        ui_tap_cb_t fn;
+        void*       vp;
+    } u;
+    u.vp = lv_event_get_user_data(e);
+    if (!u.fn) return;
+
+    lv_indev_t* indev = lv_event_get_indev(e);
+    if (!indev) return;
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+    u.fn(p.x, p.y);
+}
+
+void ui_show_touch_screen(ui_tap_cb_t on_tap, ui_cb_t on_cancel) {
+    ASSERT_OR_DIE(on_tap, "null on_tap");
+    ASSERT_OR_DIE(on_cancel, "null on_cancel");
+
+    lv_obj_t* s = ui_make_screen();
+
+    // Full-screen touch target (behind the cancel button).
+    lv_obj_t* area = lv_obj_create(s);
+    lv_obj_set_size(area, LV_PCT(100), LV_PCT(100));
+    lv_obj_align(area, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_set_style_bg_color(area, lv_color_hex(0x0a0a0a), 0);
+    lv_obj_set_style_border_width(area, 0, 0);
+    lv_obj_add_flag(area, LV_OBJ_FLAG_CLICKABLE);
+    union {
+        ui_tap_cb_t fn;
+        void*       vp;
+    } u = {.fn = on_tap};
+    lv_obj_add_event_cb(area, touch_area_tap_cb, LV_EVENT_CLICKED, u.vp);
+
+    ui_add_title(area, "Touch Screen");
+
+    touch_status = lv_label_create(area);
+    lv_obj_add_event_cb(touch_status, touch_status_delete_cb, LV_EVENT_DELETE, NULL);
+    lv_label_set_text(touch_status, "Tap anywhere to collect entropy");
+    lv_obj_set_style_text_color(touch_status, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_font(touch_status, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_align(touch_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(touch_status, LV_ALIGN_CENTER, 0, 0);
+
+    // Cancel button - centered below the status text.
+    // A short tap passes through and still collects entropy, hold (long
+    // press) to activate cancel.
+    lv_obj_t* cancel_btn = lv_button_create(s);
+    lv_obj_set_size(cancel_btn, 240, 44);
+    lv_obj_align(cancel_btn, LV_ALIGN_CENTER, 0, 70);
+    lv_obj_add_event_cb(cancel_btn, touch_area_tap_cb, LV_EVENT_CLICKED, u.vp);
+    union {
+        ui_cb_t fn;
+        void*   vp;
+    } u_cancel = {.fn = on_cancel};
+    lv_obj_add_event_cb(cancel_btn, ui_btn_invoke, LV_EVENT_LONG_PRESSED, u_cancel.vp);
+    lv_obj_t* cancel_lbl = lv_label_create(cancel_btn);
+    lv_label_set_text(cancel_lbl, "Cancel (hold to activate)");
+    lv_obj_set_style_text_font(cancel_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_center(cancel_lbl);
+
+    ui_swap_screen(s);
+}
+
+void ui_touch_screen_set_status(const char* text) {
+    if (touch_status) lv_label_set_text(touch_status, text);
 }
 
 void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel) {
