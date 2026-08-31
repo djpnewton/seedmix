@@ -11,6 +11,7 @@
 #include "ui_internal.h"
 #include "util/error.h"
 #include "util/utils.h"
+#include <stdio.h>
 #include <string.h>
 
 #ifndef ESP_PLATFORM
@@ -337,6 +338,169 @@ void ui_show_touch_screen(ui_tap_cb_t on_tap, ui_cb_t on_cancel) {
 
 void ui_touch_screen_set_status(const char* text) {
     if (touch_status) lv_label_set_text(touch_status, text);
+}
+
+/* -- Dice sides picker ----------------------------------------------- */
+static ui_uint_cb_t dice_on_sides = NULL;
+
+static void dice_sides_btn_cb(lv_event_t* e) {
+    if (!dice_on_sides) return;
+    uintptr_t v = (uintptr_t)lv_event_get_user_data(e);
+    dice_on_sides((uint8_t)v);
+}
+
+void ui_show_dice_sides(ui_uint_cb_t on_sides, ui_cb_t on_back) {
+    ASSERT_OR_DIE(on_sides, "null on_sides");
+    ASSERT_OR_DIE(on_back, "null on_back");
+
+    dice_on_sides = on_sides;
+
+    lv_obj_t* s = ui_make_screen();
+    ui_add_title(s, "Dice Sides");
+
+    lv_obj_t* lbl = lv_label_create(s);
+    lv_label_set_text(lbl, "How many sides?");
+    lv_obj_set_style_text_color(lbl, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(lbl, LV_ALIGN_TOP_MID, 0, 60);
+
+    static const unsigned sides[] = {2, 4, 6, 8, 10, 12, 20};
+    for (size_t i = 0; i < sizeof(sides) / sizeof(sides[0]); i++) {
+        int  row = (int)(i / 3);
+        int  col = (int)(i % 3);
+        char face[8];
+        snprintf(face, sizeof(face), "%u", sides[i]);
+
+        lv_obj_t* b = lv_button_create(s);
+        lv_obj_set_size(b, 80, 52);
+        lv_obj_align(b, LV_ALIGN_CENTER, (col - 1) * 92, -10 + row * 68);
+        lv_obj_add_event_cb(b, dice_sides_btn_cb, LV_EVENT_CLICKED, (void*)(uintptr_t)sides[i]);
+
+        lv_obj_t* l = lv_label_create(b);
+        lv_label_set_text(l, face);
+        lv_obj_set_style_text_font(l, &lv_font_montserrat_24, 0);
+        lv_obj_center(l);
+    }
+
+    ui_add_btn(s, "Back", on_back, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+
+    ui_swap_screen(s);
+}
+
+/* -- Dice roll entropy ----------------------------------------------- */
+static lv_obj_t*    dice_status  = NULL;
+static ui_uint_cb_t dice_on_roll = NULL;
+
+static void dice_status_delete_cb(lv_event_t* e) {
+    (void)e;
+    dice_status = NULL; // invalidate the pointer when the label is deleted
+}
+
+static void dice_btn_cb(lv_event_t* e) {
+    if (!dice_on_roll) return;
+    uintptr_t v = (uintptr_t)lv_event_get_user_data(e);
+    dice_on_roll((uint8_t)v);
+}
+
+void ui_show_dice(unsigned sides, ui_uint_cb_t on_roll, ui_cb_t on_cancel) {
+    ASSERT_OR_DIE(sides >= 2, "sides must be >= 2");
+    ASSERT_OR_DIE(on_roll, "null on_roll");
+    ASSERT_OR_DIE(on_cancel, "null on_cancel");
+
+    dice_on_roll = on_roll;
+
+    lv_obj_t* s = ui_make_screen();
+    ui_add_title(s, "Dice Rolls");
+
+    dice_status = lv_label_create(s);
+    lv_obj_add_event_cb(dice_status, dice_status_delete_cb, LV_EVENT_DELETE, NULL);
+    lv_label_set_text(dice_status, "Roll the die, tap the result");
+    lv_obj_set_style_text_color(dice_status, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_font(dice_status, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_align(dice_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(dice_status, LV_ALIGN_TOP_MID, 0, 60);
+
+    // 1..sides face buttons, wrapped into a scrollable grid.
+    lv_obj_t* grid = lv_obj_create(s);
+    lv_obj_set_size(grid, 440, 180);
+    lv_obj_align(grid, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_set_style_bg_color(grid, lv_color_black(), 0);
+    lv_obj_set_style_border_width(grid, 0, 0);
+    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(grid, 8, 0);
+    lv_obj_set_style_pad_column(grid, 8, 0);
+    lv_obj_set_scroll_dir(grid, LV_DIR_VER);
+
+    for (unsigned v = 1; v <= sides; v++) {
+        char face[8];
+        snprintf(face, sizeof(face), "%u", v);
+
+        lv_obj_t* b = lv_button_create(grid);
+        lv_obj_set_size(b, 64, 48);
+        lv_obj_add_event_cb(b, dice_btn_cb, LV_EVENT_CLICKED, (void*)(uintptr_t)v);
+
+        lv_obj_t* l = lv_label_create(b);
+        lv_label_set_text(l, face);
+        lv_obj_set_style_text_font(l, &lv_font_montserrat_24, 0);
+        lv_obj_center(l);
+    }
+
+    ui_add_btn(s, "Back", on_cancel, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+
+    ui_swap_screen(s);
+}
+
+void ui_dice_set_status(const char* text) {
+    if (dice_status) lv_label_set_text(dice_status, text);
+}
+
+/* -- Coin flip entropy ----------------------------------------------- */
+static lv_obj_t*    coin_status  = NULL;
+static ui_uint_cb_t coin_on_flip = NULL;
+
+static void coin_status_delete_cb(lv_event_t* e) {
+    (void)e;
+    coin_status = NULL; // invalidate the pointer when the label is deleted
+}
+
+static void coin_btn_cb(lv_event_t* e) {
+    if (!coin_on_flip) return;
+    lv_obj_t* lbl = lv_obj_get_child(lv_event_get_target(e), 0);
+    if (!lbl) return;
+    const char* txt = lv_label_get_text(lbl);
+    if (!txt || !txt[0]) return;
+    coin_on_flip((txt[0] == 'T') ? 1 : 0); // "Tails" -> 1, "Heads" -> 0
+}
+
+void ui_show_coin(ui_uint_cb_t on_flip, ui_cb_t on_cancel) {
+    ASSERT_OR_DIE(on_flip, "null on_flip");
+    ASSERT_OR_DIE(on_cancel, "null on_cancel");
+
+    coin_on_flip = on_flip;
+
+    lv_obj_t* s = ui_make_screen();
+    ui_add_title(s, "Coin Flips");
+
+    coin_status = lv_label_create(s);
+    lv_obj_add_event_cb(coin_status, coin_status_delete_cb, LV_EVENT_DELETE, NULL);
+    lv_label_set_text(coin_status, "Flip a coin, tap the result");
+    lv_obj_set_style_text_color(coin_status, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_font(coin_status, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_align(coin_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(coin_status, LV_ALIGN_TOP_MID, 0, 60);
+
+    ui_add_btn_evt(s, "Heads", coin_btn_cb, NULL, UI_BTN_SIZE_WIDE, LV_ALIGN_CENTER, -95, 20);
+    ui_add_btn_evt(s, "Tails", coin_btn_cb, NULL, UI_BTN_SIZE_WIDE, LV_ALIGN_CENTER, 95, 20);
+
+    ui_add_btn(s, "Back", on_cancel, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+
+    ui_swap_screen(s);
+}
+
+void ui_coin_set_status(const char* text) {
+    if (coin_status) lv_label_set_text(coin_status, text);
 }
 
 void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel) {

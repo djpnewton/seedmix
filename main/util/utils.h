@@ -6,6 +6,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -47,6 +48,26 @@ void bytes_to_hex(const uint8_t* data, size_t len, char* out, size_t out_size);
  * @param out_len   Number of bytes to produce.
  */
 void sha256_expand(const uint8_t* data, size_t data_len, uint8_t* out, size_t out_len);
+
+/**
+ * @brief True if @p wc is a supported mnemonic word count (12 or 24).
+ */
+bool utils_word_count_valid(unsigned wc);
+
+/**
+ * @brief Entropy bits required for a word count (128 or 256).
+ */
+unsigned utils_word_count_bits(unsigned wc);
+
+/**
+ * @brief Entropy bytes required for a word count (16 or 32).
+ */
+size_t utils_word_count_bytes(unsigned wc);
+
+/**
+ * @brief floor(log2(v)) for v > 0.
+ */
+unsigned utils_floor_log2(uint64_t v);
 
 #ifdef __cplusplus
 }

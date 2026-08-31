@@ -21,26 +21,18 @@ struct touch_entropy_t {
     size_t   entropy_len; // 16 or 32 bytes
 };
 
-static bool word_count_valid(unsigned wc) { return wc == 12 || wc == 24; }
-
-static unsigned floor_log2(uint64_t v) {
-    unsigned bits = 0;
-    for (; v > 1; v >>= 1) bits++;
-    return bits;
-}
-
 touch_entropy_t* touch_entropy_begin(unsigned word_count, uint32_t res_x, uint32_t res_y) {
-    ASSERT_OR_DIE(word_count_valid(word_count), "word count must be 12 or 24");
+    ASSERT_OR_DIE(utils_word_count_valid(word_count), "word count must be 12 or 24");
     ASSERT_OR_DIE(res_x > 0 && res_y > 0, "invalid resolution");
 
     touch_entropy_t* t = calloc(1, sizeof(*t));
     ASSERT_OR_DIE(t, "out of memory");
 
-    t->needed      = (word_count == 24) ? 256 : 128;
-    t->entropy_len = (word_count == 24) ? 32 : 16;
+    t->needed      = utils_word_count_bits(word_count);
+    t->entropy_len = utils_word_count_bytes(word_count);
 
     // A tap contributes log2(width * height) bits (divde by 4 to stay conservative)
-    t->per_tap = floor_log2((uint64_t)res_x * res_y) / 4;
+    t->per_tap = utils_floor_log2((uint64_t)res_x * res_y) / 4;
     if (t->per_tap == 0) t->per_tap = 1;
 
     // Worst-case accumulator capacity for the required number of taps
