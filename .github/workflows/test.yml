@@ -1,0 +1,139 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libtool-bin \
+            libsdl2-dev
+
+      - name: Build and run unit tests
+        run: bash scripts/test.sh
+
+      - name: Verify test binaries exist
+        run: |
+          for exe in \
+            seedmix_utils_tests \
+            seedmix_mnemonic_tests \
+            seedmix_dice_tests \
+            seedmix_coin_tests \
+            seedmix_secure_stack_tests \
+            seedmix_bip39_wordlist_tests \
+            seedmix_kat_tests \
+            seedmix_fatal_tests \
+            seedmix_touch_tests; do
+            test -x "build/tests/$exe"
+          done
+
+  coverage:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libtool-bin \
+            libsdl2-dev \
+            lcov
+
+      - name: Build, test, and collect coverage
+        run: bash scripts/coverage.sh
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/coverage/
+
+  sanitizers:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libtool-bin \
+            libsdl2-dev
+
+      - name: Clone dependencies
+        run: bash scripts/ensure_deps.sh
+
+      - name: Build and run tests under ASan + UBSan
+        run: |
+          cmake -S . -B build-asan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DENABLE_SANITIZERS=address,undefined \
+            -DLVGL_DIR="$PWD/external/lvgl"
+          cmake --build build-asan --target seedmix_tests -- -j"$(nproc)"
+          ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 \
+            ctest --test-dir build-asan --output-on-failure
+
+  fuzz:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libtool-bin \
+            libsdl2-dev \
+            clang
+
+      - name: Build libwally (fuzz targets link against it)
+        run: bash scripts/build.sh
+
+      - name: Fuzz (smoke run)
+        run: FUZZ_TIME=30 bash scripts/fuzz.sh

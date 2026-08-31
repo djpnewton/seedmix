@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 project(seedmix VERSION 0.1.0 LANGUAGES C)
 
 option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+option(BUILD_TESTS "Build unit tests (Linux only)" OFF)
+option(ENABLE_COVERAGE "Enable code coverage instrumentation (gcov/lcov)" OFF)
+set(ENABLE_SANITIZERS "" CACHE STRING "Comma-separated sanitizers for tests (e.g. address,undefined)")
 
 # -- Platform Detection -----------------------------------------------------
 # ESP-IDF sets CMAKE_SYSTEM_NAME when building; otherwise we assume Linux
@@ -38,4 +41,14 @@ if(PLATFORM STREQUAL "linux")
     include(${CMAKE_SOURCE_DIR}/platform/linux/linux.cmake)
 elseif(PLATFORM STREQUAL "esp32")
     include(${CMAKE_SOURCE_DIR}/platform/esp32/esp32.cmake)
+endif()
+
+# -- Tests -------------------------------------------------------------------
+if(BUILD_TESTS)
+    if(PLATFORM STREQUAL "linux")
+        enable_testing()
+        add_subdirectory(tests)
+    else()
+        message(WARNING "Tests are only supported on the Linux platform")
+    endif()
 endif()

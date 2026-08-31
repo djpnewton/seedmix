@@ -1,0 +1,89 @@
+# -- Unit tests (Linux only) -------------------------------------------------
+# Uses Unity (ThrowTheSwitch), fetched at configure time.
+
+include(FetchContent)
+
+# We only want the Unity library, not its own test suite.
+set(BUILD_TESTING OFF)
+set(UNITY_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    unity
+    GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
+    GIT_TAG        v2.6.0
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(unity)
+
+# -- Coverage instrumentation -----------------------------------------------
+# Instrument only the code under test (targets in this directory), not Unity
+# (fetched above) or libwally (built separately with autotools).
+if(ENABLE_COVERAGE)
+    add_compile_options(-g -O0 --coverage)
+    add_link_options(--coverage)
+endif()
+
+# Sanitizers for the test targets
+if(ENABLE_SANITIZERS)
+    add_compile_options(-fsanitize=${ENABLE_SANITIZERS} -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=${ENABLE_SANITIZERS})
+endif()
+
+# -- Library under test ------------------------------------------------------
+# Standalone units only (no LVGL/UI/platform).  error.c is excluded because it
+# depends on LVGL; minimal stubs are provided in support/:
+#   fatal_stub.c  - fatal_handler replacement
+#   hal_stub.c    - deterministic hal_get_random* replacement
+add_library(seedmix_test_util STATIC
+    ${CMAKE_SOURCE_DIR}/main/util/utils.c
+    ${CMAKE_SOURCE_DIR}/main/util/log.c
+    ${CMAKE_SOURCE_DIR}/main/crypto/secure_stack.c
+    ${CMAKE_SOURCE_DIR}/main/crypto/mnemonic.c
+    ${CMAKE_SOURCE_DIR}/main/crypto/bip39_wordlist.c
+    ${CMAKE_SOURCE_DIR}/main/crypto/touch.c
+    ${CMAKE_SOURCE_DIR}/main/crypto/dice.c
+    ${CMAKE_SOURCE_DIR}/main/crypto/coin.c
+    support/fatal_stub.c
+    support/hal_stub.c
+)
+
+target_include_directories(seedmix_test_util PUBLIC
+    ${CMAKE_SOURCE_DIR}/main
+    ${CMAKE_SOURCE_DIR}/main/util
+    ${CMAKE_SOURCE_DIR}/main/crypto
+)
+
+# libwally (IMPORTED, GLOBAL) is defined by platform/linux/linux.cmake
+target_link_libraries(seedmix_test_util PUBLIC libwally)
+
+target_compile_options(seedmix_test_util PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+# -- Test executables (one per suite; each defines its own main()) -----------
+function(seedmix_add_test name src)
+    add_executable(${name} ${src})
+    target_link_libraries(${name} PRIVATE seedmix_test_util unity)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
+    target_compile_options(${name} PRIVATE
+        -Wall -Wextra -Wpedantic
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O2>
+    )
+    add_test(NAME ${name} COMMAND ${name})
+    set_property(GLOBAL APPEND PROPERTY SEEDMIX_TEST_EXECUTABLES ${name})
+endfunction()
+
+seedmix_add_test(seedmix_utils_tests          test_utils.c)
+seedmix_add_test(seedmix_mnemonic_tests       test_mnemonic.c)
+seedmix_add_test(seedmix_dice_tests           test_dice.c)
+seedmix_add_test(seedmix_coin_tests           test_coin.c)
+seedmix_add_test(seedmix_secure_stack_tests   test_secure_stack.c)
+seedmix_add_test(seedmix_bip39_wordlist_tests test_bip39_wordlist.c)
+seedmix_add_test(seedmix_kat_tests            test_kat.c)
+seedmix_add_test(seedmix_fatal_tests          test_fatal.c)
+seedmix_add_test(seedmix_touch_tests          test_touch.c)
+
+# Convenience target built by scripts/test.sh
+get_property(_test_exes GLOBAL PROPERTY SEEDMIX_TEST_EXECUTABLES)
+add_custom_target(seedmix_tests DEPENDS ${_test_exes})

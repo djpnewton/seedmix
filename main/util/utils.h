@@ -39,8 +39,9 @@ void bytes_to_hex(const uint8_t* data, size_t len, char* out, size_t out_size);
  * @brief Deterministically expand @p data into @p out_len bytes using
  *        SHA-256 in counter mode (works for any output length).
  *
- * The first 32-byte block is SHA-256(data); each subsequent block is
- * SHA-256(counter || seed).  This is an expansion, not a KDF.
+ * The input is first hashed to a 32-byte seed (SHA-256(data)); each 32-byte
+ * output block is then SHA-256(counter || seed) with a 4-byte big-endian
+ * counter starting at 0.  This is an expansion, not a KDF.
  *
  * @param data      Input bytes.
  * @param data_len  Number of input bytes.
