@@ -37,7 +37,7 @@ size_t bip39_wordlist_lookup(const char* prefix, const char** matches) {
     if (!prefix || !*prefix) return 0;
     size_t plen  = strlen(prefix);
     size_t count = 0;
-    for (size_t i = 0; i < BIP39_WORD_COUNT; i++) {
+    for (size_t i = 0; i < BIP39_WORD_COUNT && count < BIP39_MAX_MATCHES; i++) {
         if (prefix_match(wordlist[i], prefix, plen)) {
             matches[count++] = wordlist[i];
         }
