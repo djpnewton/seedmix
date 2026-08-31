@@ -14,6 +14,9 @@ extern "C" {
 
 typedef void (*ui_cb_t)(void);
 
+#define UI_COLOR_SEED_GREEN 0xA6CF5E // light green
+#define UI_COLOR_MIX_GREEN 0x305C2B  // dark green
+
 typedef enum {
     MNEMONIC_TYPE_GENERATED,
     MNEMONIC_TYPE_ENTERED,
@@ -41,6 +44,14 @@ void ui_show_merge_process(const char* current_words, const char* current_entrop
 void ui_show_msg(const char* msg);
 void ui_delay_ms(uint32_t ms);
 void ui_go_main(void);
+
+/**
+ * @brief Show a brief startup splash screen, then call @p on_done.
+ *
+ * The splash is shown for a fixed delay and then automatically transitions
+ * to @p on_done (typically the main screen).
+ */
+void ui_show_splash(ui_cb_t on_done);
 
 /**
  * @brief Zero all label text on @p scr (recursively) without deleting it.

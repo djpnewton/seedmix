@@ -34,7 +34,7 @@ static void on_show_state(void);
 static void go_back_source(void);
 static void go_source(void);
 static void on_finish(void);
-static void show_merge_screen(mnemonic_t* new_m, mnemonic_type_t result_type);
+static void show_merge_screen(mnemonic_t* new_m, const char* source_desc);
 static void on_new_wallet(lv_event_t* e);
 static void on_test_error(lv_event_t* e);
 
@@ -47,7 +47,7 @@ static void on_generating_msg(const char* msg) {
 // and return to the source screen
 static void merge_or_reject(mnemonic_t* m, mnemonic_type_t result_type, const char* source_desc) {
     if (current && mnemonic_entropy_size(current) != mnemonic_entropy_size(m)) {
-        ui_log_add("Rejected %s: word count mismatch", source_desc);
+        ui_log_add("rejected %s: word count mismatch", source_desc);
         mnemonic_discard(m);
         ui_show_msg("Word count mismatch - mnemonic discarded");
         ui_delay_ms(1500);
@@ -55,11 +55,10 @@ static void merge_or_reject(mnemonic_t* m, mnemonic_type_t result_type, const ch
         return;
     }
     if (current) {
-        ui_log_add("Combined with %s", source_desc);
-        show_merge_screen(m, result_type);
+        show_merge_screen(m, source_desc);
     } else {
         current = m;
-        ui_log_add("%s", source_desc);
+        ui_log_add("started with %s", source_desc);
         ui_show_mnemonic(mnemonic_words(current), result_type, go_source);
     }
 }
@@ -68,15 +67,16 @@ static void on_generate(void) {
     ui_show_msg("Generating words...");
     ui_delay_ms(500);
     mnemonic_t* m = mnemonic_generate(word_count, on_generating_msg);
-    char        desc[48];
-    int         res = snprintf(desc, sizeof(desc), "generated %u-word", word_count);
+    char        desc[64];
+    int         res = snprintf(desc, sizeof(desc), "generated %u-word from %s", word_count,
+                       hal_get_random_source());
     ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
     merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
 }
 
-static word_entry_handle_t we_handle         = NULL;
-static mnemonic_t*         pending_new       = NULL;
-static mnemonic_type_t     merge_result_type = MNEMONIC_TYPE_GENERATED;
+static word_entry_handle_t we_handle   = NULL;
+static mnemonic_t*         pending_new = NULL;
+static char                pending_desc[64];
 
 static void on_enter_manual(void);
 static void on_we_complete(void);
@@ -89,10 +89,11 @@ static void on_merge_done(void) {
     ui_scrub_screen(lv_screen_active());
     current     = mnemonic_combine(current, pending_new);
     pending_new = NULL;
-    ui_show_mnemonic(mnemonic_words(current), merge_result_type, go_source);
+    ui_log_add("merged with %s", pending_desc);
+    ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_MERGED, go_source);
 }
 
-static void show_merge_screen(mnemonic_t* new_m, mnemonic_type_t result_type) {
+static void show_merge_screen(mnemonic_t* new_m, const char* source_desc) {
     uint8_t ca[32], na[32], ma[32];
     size_t  elen = mnemonic_entropy_size(current);
     mnemonic_to_entropy(current, ca);
@@ -110,8 +111,8 @@ static void show_merge_screen(mnemonic_t* new_m, mnemonic_type_t result_type) {
     secure_memzero(na, sizeof(na));
     secure_memzero(ca, sizeof(ca));
 
-    merge_result_type = result_type;
-    pending_new       = new_m;
+    pending_new = new_m;
+    snprintf(pending_desc, sizeof(pending_desc), "%s", source_desc);
 
     ui_show_merge_process(mnemonic_words(current), ca_hex, na_hex, ma_hex, mnemonic_words(preview),
                           on_merge_done);
@@ -329,7 +330,7 @@ static void on_camera_use(void) {
     camera_release();
 
     char desc[48];
-    int  res = snprintf(desc, sizeof(desc), "%u-word camera image", word_count);
+    int  res = snprintf(desc, sizeof(desc), "camera image %u-word", word_count);
     ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
     merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
 }
@@ -396,7 +397,7 @@ static void on_finish(void) {
         return;
     }
     ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_FINAL, ui_go_main);
-    ui_log_add("Finished");
+    ui_log_add("finished");
     mnemonic_discard(current);
     current = NULL;
     if (we_handle) {
@@ -420,14 +421,16 @@ static void on_test_error(lv_event_t* e) {
 }
 
 /* -- Initialization --------------------------------------------------- */
+static void show_main_screen(void) { ui_show_main(on_new_wallet, on_test_error); }
+
 void app_init(void) {
     lv_display_t* disp = lv_display_get_default();
     lv_theme_t*   th =
-        lv_theme_default_init(disp, lv_palette_main(LV_PALETTE_BLUE),
-                              lv_palette_main(LV_PALETTE_CYAN), true, &lv_font_montserrat_20);
+        lv_theme_default_init(disp, lv_color_hex(UI_COLOR_MIX_GREEN),
+                              lv_color_hex(UI_COLOR_SEED_GREEN), true, &lv_font_montserrat_20);
     lv_disp_set_theme(disp, th);
 
     mnemonic_init();
 
-    ui_show_main(on_new_wallet, on_test_error);
+    ui_show_splash(show_main_screen);
 }
