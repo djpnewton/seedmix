@@ -13,10 +13,26 @@
 extern "C" {
 #endif
 
+typedef enum {
+    UI_BTN_SIZE_SMALL, // 80 x 30  corner/utility buttons
+    UI_BTN_SIZE_MED,   // 160 x 44 confirm/back buttons
+    UI_BTN_SIZE_LARGE, // 200 x 44 primary navigation buttons
+    UI_BTN_SIZE_WIDE,  // 180 x 44 side-by-side action buttons
+    UI_BTN_SIZE_HERO,  // 240 x 56 hero call-to-action
+} ui_btn_size_t;
+
 lv_obj_t* ui_make_screen(void);
 lv_obj_t* ui_add_title(lv_obj_t* parent, const char* text);
 void      ui_btn_invoke(lv_event_t* e);
 void      ui_swap_screen(lv_obj_t* new_scr);
+
+/** Create a button with a plain void(void) callback. */
+lv_obj_t* ui_add_btn(lv_obj_t* parent, const char* text, ui_cb_t cb, ui_btn_size_t size,
+                     lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs);
+
+/** Create a button with an LVGL event callback (and optional user_data). */
+lv_obj_t* ui_add_btn_evt(lv_obj_t* parent, const char* text, lv_event_cb_t evt_cb, void* user_data,
+                         ui_btn_size_t size, lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs);
 
 #ifdef __cplusplus
 }

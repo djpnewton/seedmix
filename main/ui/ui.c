@@ -4,8 +4,11 @@
  */
 
 #include "ui.h"
+#include "assets/logo_img.h"
+#include "assets/splash_img.h"
 #include "mnemonic_view.h"
 #include "src/widgets/label/lv_label_private.h"
+#include "ui_internal.h"
 #include "util/error.h"
 #include "util/utils.h"
 #include <string.h>
@@ -87,10 +90,34 @@ void ui_btn_invoke(lv_event_t* e) {
     if (u.fn) u.fn();
 }
 
-static lv_obj_t* add_btn(lv_obj_t* parent, const char* text, ui_cb_t cb, int y) {
+/* -- Button creation -------------------------------------------------- */
+static const struct {
+    lv_coord_t       w;
+    lv_coord_t       h;
+    const lv_font_t* font;
+} btn_sizes[] = {
+    [UI_BTN_SIZE_SMALL] = {80, 30, &lv_font_montserrat_14},
+    [UI_BTN_SIZE_MED]   = {160, 44, &lv_font_montserrat_24},
+    [UI_BTN_SIZE_LARGE] = {200, 44, &lv_font_montserrat_24},
+    [UI_BTN_SIZE_WIDE]  = {180, 44, &lv_font_montserrat_24},
+    [UI_BTN_SIZE_HERO]  = {240, 56, &lv_font_montserrat_28},
+};
+
+static lv_obj_t* add_btn_impl(lv_obj_t* parent, const char* text, ui_btn_size_t size,
+                              lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs) {
     lv_obj_t* b = lv_button_create(parent);
-    lv_obj_set_size(b, 200, 55);
-    lv_obj_align(b, LV_ALIGN_CENTER, 0, y);
+    lv_obj_set_size(b, btn_sizes[size].w, btn_sizes[size].h);
+    lv_obj_align(b, align, x_ofs, y_ofs);
+    lv_obj_t* l = lv_label_create(b);
+    lv_label_set_text(l, text);
+    lv_obj_set_style_text_font(l, btn_sizes[size].font, 0);
+    lv_obj_center(l);
+    return b;
+}
+
+lv_obj_t* ui_add_btn(lv_obj_t* parent, const char* text, ui_cb_t cb, ui_btn_size_t size,
+                     lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs) {
+    lv_obj_t* b = add_btn_impl(parent, text, size, align, x_ofs, y_ofs);
     if (cb) {
         union {
             ui_cb_t fn;
@@ -98,15 +125,53 @@ static lv_obj_t* add_btn(lv_obj_t* parent, const char* text, ui_cb_t cb, int y) 
         } u = {.fn = cb};
         lv_obj_add_event_cb(b, ui_btn_invoke, LV_EVENT_CLICKED, u.vp);
     }
-    lv_obj_t* l = lv_label_create(b);
-    lv_label_set_text(l, text);
-    lv_obj_set_style_text_font(l, &lv_font_montserrat_24, 0);
-    lv_obj_center(l);
+    return b;
+}
+
+lv_obj_t* ui_add_btn_evt(lv_obj_t* parent, const char* text, lv_event_cb_t evt_cb, void* user_data,
+                         ui_btn_size_t size, lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs) {
+    lv_obj_t* b = add_btn_impl(parent, text, size, align, x_ofs, y_ofs);
+    if (evt_cb) lv_obj_add_event_cb(b, evt_cb, LV_EVENT_CLICKED, user_data);
     return b;
 }
 
 void ui_go_main(void) {
     if (main_scr) lv_scr_load(main_scr);
+}
+
+/* -- Splash screen ---------------------------------------------------- */
+typedef struct {
+    ui_cb_t   on_done;
+    lv_obj_t* screen;
+} splash_ctx_t;
+
+static void splash_timer_cb(lv_timer_t* t) {
+    splash_ctx_t* ctx     = (splash_ctx_t*)lv_timer_get_user_data(t);
+    ui_cb_t       on_done = ctx->on_done;
+    lv_obj_t*     screen  = ctx->screen;
+
+    lv_timer_delete(t);
+    lv_free(ctx);
+
+    if (on_done) on_done(); // swaps to the next screen
+    lv_obj_delete(screen);  // splash is no longer active - safe to free
+}
+
+void ui_show_splash(ui_cb_t on_done) {
+    lv_obj_t* s = ui_make_screen();
+
+    lv_obj_t* img = lv_image_create(s);
+    lv_image_set_src(img, &splash_img_dsc);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
+
+    lv_scr_load(s);
+
+    splash_ctx_t* ctx = lv_malloc(sizeof(*ctx));
+    ASSERT_OR_DIE(ctx, "splash ctx alloc");
+    ctx->on_done  = on_done;
+    ctx->screen   = s;
+    lv_timer_t* t = lv_timer_create(splash_timer_cb, 2000, ctx);
+    lv_timer_set_repeat_count(t, 1);
 }
 
 /* -- Screens ---------------------------------------------------------- */
@@ -115,43 +180,23 @@ void ui_show_main(lv_event_cb_t on_new_wallet, lv_event_cb_t on_test_error) {
     ASSERT_OR_DIE(on_test_error, "null on_test_error");
 
     if (!main_scr) {
-        main_scr = lv_screen_active();
+        main_scr = ui_make_screen();
 
         // Build main screen with "New Wallet" button
         lv_obj_t* scr = main_scr;
         lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
 
-        lv_obj_t* title = lv_label_create(scr);
-        lv_label_set_text(title, "SeedMix");
-        lv_obj_set_style_text_color(title, lv_color_white(), 0);
-        lv_obj_set_style_text_font(title, &lv_font_montserrat_48, 0);
-        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
+        lv_obj_t* logo = lv_image_create(scr);
+        lv_image_set_src(logo, &logo_img_dsc);
+        lv_obj_align(logo, LV_ALIGN_TOP_LEFT, 10, 10);
 
-        lv_obj_t* btn = lv_button_create(scr);
-        lv_obj_set_size(btn, 240, 70);
-        lv_obj_align(btn, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_add_event_cb(btn, on_new_wallet, LV_EVENT_CLICKED, NULL);
-        lv_obj_t* bl = lv_label_create(btn);
-        lv_label_set_text(bl, "New Wallet");
-        lv_obj_set_style_text_font(bl, &lv_font_montserrat_28, 0);
-        lv_obj_center(bl);
+        ui_add_btn_evt(scr, "New Wallet", on_new_wallet, NULL, UI_BTN_SIZE_HERO, LV_ALIGN_CENTER, 0,
+                       0);
 
         // Test error button
-        lv_obj_t* test_btn = lv_button_create(scr);
-        lv_obj_set_size(test_btn, 80, 30);
-        lv_obj_align(test_btn, LV_ALIGN_BOTTOM_RIGHT, -40, -10);
+        lv_obj_t* test_btn = ui_add_btn_evt(scr, "test error!", on_test_error, NULL,
+                                            UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -40, -10);
         lv_obj_set_style_bg_color(test_btn, lv_color_hex(0x440000), 0);
-        lv_obj_add_event_cb(test_btn, on_test_error, LV_EVENT_CLICKED, NULL);
-        lv_obj_t* tbl = lv_label_create(test_btn);
-        lv_label_set_text(tbl, "test error!");
-        lv_obj_set_style_text_font(tbl, &lv_font_montserrat_14, 0);
-        lv_obj_center(tbl);
-
-        lv_obj_t* footer = lv_label_create(scr);
-        lv_label_set_text(footer, "BIP39 Mnemonic Tool");
-        lv_obj_set_style_text_color(footer, lv_color_hex(0x808080), 0);
-        lv_obj_set_style_text_font(footer, &lv_font_montserrat_14, 0);
-        lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, -10);
     }
     lv_scr_load(main_scr);
     // clean up any leaked screen from before main was first shown
@@ -167,8 +212,8 @@ void ui_show_word_count(ui_cb_t on_12, ui_cb_t on_24) {
 
     lv_obj_t* s = ui_make_screen();
     ui_add_title(s, "How many words?");
-    add_btn(s, "12 words", on_12, -40);
-    add_btn(s, "24 words", on_24, 30);
+    ui_add_btn(s, "12 words", on_12, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -40);
+    ui_add_btn(s, "24 words", on_24, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 30);
     ui_swap_screen(s);
 }
 
@@ -182,37 +227,15 @@ void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_other_sour
 
     lv_obj_t* s = ui_make_screen();
     ui_add_title(s, is_additional ? "Choose Additional Source" : "Choose Initial Source");
-    add_btn(s, "Generate Here", on_generate, -40);
-    add_btn(s, "Enter Manually", on_enter, 30);
-    add_btn(s, "Other Source", on_other_source, 100);
+    ui_add_btn(s, "Generate Here", on_generate, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -40);
+    ui_add_btn(s, "Enter Manually", on_enter, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 30);
+    ui_add_btn(s, "Other Source", on_other_source, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 100);
 
-    // state button (top-left)
-    lv_obj_t* state_btn = lv_button_create(s);
-    lv_obj_set_size(state_btn, 70, 30);
-    lv_obj_align(state_btn, LV_ALIGN_BOTTOM_LEFT, 10, -10);
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } u = {.fn = on_state};
-    lv_obj_add_event_cb(state_btn, ui_btn_invoke, LV_EVENT_CLICKED, u.vp);
-    lv_obj_t* sl = lv_label_create(state_btn);
-    lv_label_set_text(sl, "State");
-    lv_obj_set_style_text_font(sl, &lv_font_montserrat_14, 0);
-    lv_obj_center(sl);
+    // state button (bottom-left)
+    ui_add_btn(s, "State", on_state, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 
-    // finish button (top-right)
-    lv_obj_t* fin_btn = lv_button_create(s);
-    lv_obj_set_size(fin_btn, 70, 30);
-    lv_obj_align(fin_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } u2 = {.fn = on_finish};
-    lv_obj_add_event_cb(fin_btn, ui_btn_invoke, LV_EVENT_CLICKED, u2.vp);
-    lv_obj_t* fl = lv_label_create(fin_btn);
-    lv_label_set_text(fl, "Finish");
-    lv_obj_set_style_text_font(fl, &lv_font_montserrat_14, 0);
-    lv_obj_center(fl);
+    // finish button (bottom-right)
+    ui_add_btn(s, "Finish", on_finish, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
     ui_swap_screen(s);
 }
@@ -227,24 +250,13 @@ void ui_show_other_source(ui_cb_t on_camera, ui_cb_t on_scan_qr, ui_cb_t on_dice
 
     lv_obj_t* s = ui_make_screen();
     ui_add_title(s, "Other Sources");
-    add_btn(s, "Camera Image", on_camera, -90);
-    add_btn(s, "Scan QR", on_scan_qr, -15);
-    add_btn(s, "Dice Rolls", on_dice, 60);
-    add_btn(s, "Coin Flips", on_coins, 135);
+    ui_add_btn(s, "Camera Image", on_camera, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -82);
+    ui_add_btn(s, "Scan QR", on_scan_qr, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -28);
+    ui_add_btn(s, "Dice Rolls", on_dice, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 26);
+    ui_add_btn(s, "Coin Flips", on_coins, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 80);
 
     /* back button (bottom-right) */
-    lv_obj_t* back_btn = lv_button_create(s);
-    lv_obj_set_size(back_btn, 70, 30);
-    lv_obj_align(back_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } ub = {.fn = on_back};
-    lv_obj_add_event_cb(back_btn, ui_btn_invoke, LV_EVENT_CLICKED, ub.vp);
-    lv_obj_t* bl = lv_label_create(back_btn);
-    lv_label_set_text(bl, "Back");
-    lv_obj_set_style_text_font(bl, &lv_font_montserrat_14, 0);
-    lv_obj_center(bl);
+    ui_add_btn(s, "Back", on_back, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
     ui_swap_screen(s);
 }
@@ -265,31 +277,8 @@ void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel) {
     lv_obj_align(camera_img, LV_ALIGN_TOP_MID, 0, 45);
 
     /* "Use Image" (left) and "Cancel" (right). */
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } u_use           = {.fn = on_use};
-    lv_obj_t* use_btn = lv_button_create(s);
-    lv_obj_set_size(use_btn, 180, 55);
-    lv_obj_align(use_btn, LV_ALIGN_BOTTOM_LEFT, 20, -10);
-    lv_obj_add_event_cb(use_btn, ui_btn_invoke, LV_EVENT_CLICKED, u_use.vp);
-    lv_obj_t* use_lbl = lv_label_create(use_btn);
-    lv_label_set_text(use_lbl, "Use Image");
-    lv_obj_set_style_text_font(use_lbl, &lv_font_montserrat_24, 0);
-    lv_obj_center(use_lbl);
-
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } u_cancel           = {.fn = on_cancel};
-    lv_obj_t* cancel_btn = lv_button_create(s);
-    lv_obj_set_size(cancel_btn, 180, 55);
-    lv_obj_align(cancel_btn, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
-    lv_obj_add_event_cb(cancel_btn, ui_btn_invoke, LV_EVENT_CLICKED, u_cancel.vp);
-    lv_obj_t* cancel_lbl = lv_label_create(cancel_btn);
-    lv_label_set_text(cancel_lbl, "Cancel");
-    lv_obj_set_style_text_font(cancel_lbl, &lv_font_montserrat_24, 0);
-    lv_obj_center(cancel_lbl);
+    ui_add_btn(s, "Use Image", on_use, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_LEFT, 20, -10);
+    ui_add_btn(s, "Cancel", on_cancel, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
 
     ui_swap_screen(s);
 }
@@ -362,18 +351,8 @@ void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok) {
     ui_mnemonic_view_set_words(grid, words);
     lv_obj_update_layout(grid);
 
-    lv_obj_t* ok = lv_button_create(s);
-    lv_obj_set_size(ok, 160, 50);
+    lv_obj_t* ok = ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, 0, 0);
     lv_obj_align_to(ok, grid, LV_ALIGN_OUT_BOTTOM_MID, 0, 12);
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } u = {.fn = on_ok};
-    lv_obj_add_event_cb(ok, ui_btn_invoke, LV_EVENT_CLICKED, u.vp);
-    lv_obj_t* ol = lv_label_create(ok);
-    lv_label_set_text(ol, "Ok");
-    lv_obj_set_style_text_font(ol, &lv_font_montserrat_24, 0);
-    lv_obj_center(ol);
 
     ui_swap_screen(s);
 }
@@ -425,18 +404,7 @@ void ui_show_merge_process(const char* current_words, const char* current_entrop
         }
     }
 
-    lv_obj_t* ok = lv_button_create(s);
-    lv_obj_set_size(ok, 160, 50);
-    lv_obj_align(ok, LV_ALIGN_BOTTOM_MID, 0, -10);
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } u = {.fn = on_ok};
-    lv_obj_add_event_cb(ok, ui_btn_invoke, LV_EVENT_CLICKED, u.vp);
-    lv_obj_t* ol = lv_label_create(ok);
-    lv_label_set_text(ol, "Ok");
-    lv_obj_set_style_text_font(ol, &lv_font_montserrat_24, 0);
-    lv_obj_center(ol);
+    ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_MID, 0, -10);
 
     ui_swap_screen(s);
 }
@@ -457,7 +425,7 @@ void ui_show_enter_words(ui_cb_t on_ok) {
     lv_obj_set_style_text_font(ta, &lv_font_montserrat_14, 0);
     lv_obj_add_event_cb(ta, NULL, LV_EVENT_ALL, NULL); // just to hold reference
 
-    add_btn(s, "OK", on_ok, 100);
+    ui_add_btn(s, "OK", on_ok, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 100);
     lv_group_focus_obj(ta);
     ui_swap_screen(s);
 }

@@ -4,6 +4,7 @@
  */
 
 #include "log.h"
+#include "mnemonic_view.h"
 #include "ui_internal.h"
 #include "util/error.h"
 #include <stdarg.h>
@@ -17,10 +18,19 @@ static int  log_head  = 0; // next write position
 static int  log_count = 0; // total entries (capped at LOG_MAX)
 
 void ui_log_add(const char* fmt, ...) {
+    // Prefix an elapsed-time stamp (uptime HH:MM:SS) to each entry.
+    uint32_t t = lv_tick_get();
+    unsigned h = (unsigned)(t / 3600000u);
+    unsigned m = (unsigned)((t / 60000u) % 60u);
+    unsigned s = (unsigned)((t / 1000u) % 60u);
+
+    int prefix = snprintf(log_buf[log_head], LOG_LEN, "[%02u:%02u:%02u] ", h, m, s);
+
     va_list args;
     va_start(args, fmt);
-    vsnprintf(log_buf[log_head], LOG_LEN, fmt, args);
+    vsnprintf(log_buf[log_head] + prefix, LOG_LEN - prefix, fmt, args);
     va_end(args);
+
     log_head = (log_head + 1) % LOG_MAX;
     if (log_count < LOG_MAX) log_count++;
 }
@@ -32,24 +42,30 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
     lv_obj_t* s = ui_make_screen();
     ui_add_title(s, "State & Log");
 
-    // mnemonic display
-    lv_obj_t* ml = lv_label_create(s);
+    // mnemonic display: numbered grid, or a placeholder if none yet
+    lv_obj_t* mn_area;
     if (mnemonic_words && mnemonic_words[0]) {
-        lv_label_set_text(ml, mnemonic_words);
+        mn_area = ui_mnemonic_view_create(s);
+        ui_mnemonic_view_set_words(mn_area, mnemonic_words);
     } else {
-        lv_label_set_text(ml, "(no mnemonic yet)");
+        mn_area = lv_label_create(s);
+        lv_label_set_text(mn_area, "(no mnemonic yet)");
+        lv_obj_set_style_text_color(mn_area, lv_color_hex(0x888888), 0);
+        lv_obj_set_style_text_font(mn_area, &lv_font_montserrat_18, 0);
     }
-    lv_obj_set_style_text_color(ml, lv_color_white(), 0);
-    lv_obj_set_style_text_font(ml, &lv_font_montserrat_18, 0);
-    lv_obj_set_style_text_align(ml, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(ml, 440);
-    lv_label_set_long_mode(ml, LV_LABEL_LONG_WRAP);
-    lv_obj_align(ml, LV_ALIGN_TOP_MID, 0, 35);
+    lv_obj_align(mn_area, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_update_layout(mn_area);
+
+    // Cap tall grids (24 words) so the log below always has room; allow scroll.
+    lv_coord_t mn_h = lv_obj_get_height(mn_area);
+    if (mnemonic_words && mnemonic_words[0] && mn_h > 150) {
+        lv_obj_set_height(mn_area, 150);
+        lv_obj_add_flag(mn_area, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scroll_dir(mn_area, LV_DIR_VER);
+    }
 
     // log entries (oldest first, top to bottom)
     lv_obj_t* log_cont = lv_obj_create(s);
-    lv_obj_set_size(log_cont, 440, 200);
-    lv_obj_align(log_cont, LV_ALIGN_BOTTOM_MID, 0, -65);
     lv_obj_set_style_bg_color(log_cont, lv_color_hex(0x111111), 0);
     lv_obj_set_style_border_width(log_cont, 0, 0);
     lv_obj_set_flex_flow(log_cont, LV_FLEX_FLOW_COLUMN);
@@ -64,21 +80,20 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
         lv_label_set_text(entry, log_buf[idx]);
         lv_obj_set_style_text_color(entry, lv_color_hex(0xAAAAAA), 0);
         lv_obj_set_style_text_font(entry, &lv_font_montserrat_14, 0);
+        lv_label_set_long_mode(entry, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(entry, 420);
     }
 
+    // Fit the log between the mnemonic area and the back button.
+    lv_coord_t mn_bottom = lv_obj_get_y(mn_area) + lv_obj_get_height(mn_area);
+    lv_coord_t log_top   = mn_bottom + 8;
+    lv_coord_t log_h     = (320 - 10 - 44) - 8 - log_top; /* above back button */
+    if (log_h < 40) log_h = 40;
+    lv_obj_set_size(log_cont, 440, log_h);
+    lv_obj_align(log_cont, LV_ALIGN_TOP_MID, 0, log_top);
+
     // back button
-    lv_obj_t* back = lv_button_create(s);
-    lv_obj_set_size(back, 160, 50);
-    lv_obj_align(back, LV_ALIGN_BOTTOM_MID, 0, -10);
-    union {
-        ui_cb_t fn;
-        void*   vp;
-    } u = {.fn = on_back};
-    lv_obj_add_event_cb(back, ui_btn_invoke, LV_EVENT_CLICKED, u.vp);
-    lv_obj_t* bl = lv_label_create(back);
-    lv_label_set_text(bl, "Back");
-    lv_obj_set_style_text_font(bl, &lv_font_montserrat_24, 0);
-    lv_obj_center(bl);
+    ui_add_btn(s, "Back", on_back, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_MID, 0, -10);
 
     ui_swap_screen(s);
 }

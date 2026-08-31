@@ -115,23 +115,9 @@ static void we_select_word(lv_event_t* e) {
         lv_obj_set_style_text_font(w, &lv_font_montserrat_48, 0);
         lv_obj_align(w, LV_ALIGN_CENTER, 0, -10);
 
-        lv_obj_t* yes = lv_button_create(s);
-        lv_obj_set_size(yes, 160, 55);
-        lv_obj_align(yes, LV_ALIGN_CENTER, -90, 60);
-        lv_obj_add_event_cb(yes, we_confirm, LV_EVENT_CLICKED, c);
-        lv_obj_t* yl = lv_label_create(yes);
-        lv_label_set_text(yl, "Yes");
-        lv_obj_set_style_text_font(yl, &lv_font_montserrat_24, 0);
-        lv_obj_center(yl);
+        ui_add_btn_evt(s, "Yes", we_confirm, c, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, -90, 60);
 
-        lv_obj_t* no = lv_button_create(s);
-        lv_obj_set_size(no, 160, 55);
-        lv_obj_align(no, LV_ALIGN_CENTER, 90, 60);
-        lv_obj_add_event_cb(no, we_cancel_confirm, LV_EVENT_CLICKED, c);
-        lv_obj_t* nl = lv_label_create(no);
-        lv_label_set_text(nl, "No");
-        lv_obj_set_style_text_font(nl, &lv_font_montserrat_24, 0);
-        lv_obj_center(nl);
+        ui_add_btn_evt(s, "No", we_cancel_confirm, c, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, 90, 60);
 
         lv_scr_load(s);
     }
@@ -216,14 +202,7 @@ word_entry_handle_t ui_word_entry_begin(unsigned total_words, ui_cb_t on_done, u
     lv_obj_add_event_cb(kb, we_keyboard_cb, LV_EVENT_ALL, c); // pass ctx as user_data
     lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
 
-    lv_obj_t* back_btn = lv_button_create(s);
-    lv_obj_set_size(back_btn, 60, 40);
-    lv_obj_align(back_btn, LV_ALIGN_TOP_RIGHT, -10, 5);
-    lv_obj_add_event_cb(back_btn, we_go_back, LV_EVENT_CLICKED, c);
-    lv_obj_t* bl = lv_label_create(back_btn);
-    lv_label_set_text(bl, "Back");
-    lv_obj_set_style_text_font(bl, &lv_font_montserrat_14, 0);
-    lv_obj_center(bl);
+    ui_add_btn_evt(s, "Back", we_go_back, c, UI_BTN_SIZE_SMALL, LV_ALIGN_TOP_RIGHT, -10, 5);
 
     lv_scr_load(s);
     return c;
