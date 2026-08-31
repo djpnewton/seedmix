@@ -5,6 +5,7 @@
 
 #include "app.h"
 #include "crypto/mnemonic.h"
+#include "crypto/touch.h"
 #include "hal.h"
 #include "lvgl.h"
 #include "ui/log.h"
@@ -30,6 +31,8 @@ static void on_camera_cancel(void);
 static void on_scan_qr(void);
 static void on_dice_rolls(void);
 static void on_coin_flips(void);
+static void on_touch_screen(void);
+static void on_touch_tap(lv_coord_t x, lv_coord_t y);
 static void on_show_state(void);
 static void go_back_source(void);
 static void go_source(void);
@@ -136,7 +139,8 @@ static void on_enter_manual(void) {
 }
 
 static void on_other_source(void) {
-    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, go_source);
+    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, on_touch_screen,
+                         go_source);
 }
 
 /* -- Camera image source --------------------------------------------- */
@@ -301,7 +305,8 @@ static void on_camera_image(void) {
 
 static void on_camera_cancel(void) {
     camera_feed_stop();
-    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, go_source);
+    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, on_touch_screen,
+                         go_source);
 }
 
 static void on_camera_use(void) {
@@ -340,6 +345,56 @@ static void on_scan_qr(void) { FATAL("Scan QR not yet implemented."); }
 static void on_dice_rolls(void) { FATAL("Dice rolls not yet implemented."); }
 
 static void on_coin_flips(void) { FATAL("Coin flips not yet implemented."); }
+
+/* -- Touch screen entropy source -------------------------------------- */
+static touch_entropy_t* touch = NULL;
+
+static void on_touch_tap(lv_coord_t x, lv_coord_t y) {
+    ASSERT_OR_DIE(touch, "no active touch session");
+    touch_entropy_add_tap(touch, x, y);
+
+    if (!touch_entropy_ready(touch)) {
+        char status[64];
+        int  res = snprintf(status, sizeof(status), "Entropy: %u / %u bits",
+                           touch_entropy_bits(touch), touch_entropy_needed(touch));
+        ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(status), "status string too long");
+        ui_touch_screen_set_status(status);
+        return;
+    }
+
+    unsigned taps = touch_entropy_taps(touch);
+    uint8_t  entropy[32];
+    size_t   elen = touch_entropy_derive(touch, entropy, sizeof(entropy));
+    ASSERT_OR_DIE(elen == 16 || elen == 32, "unexpected entropy length");
+    mnemonic_t* m = mnemonic_from_entropy(entropy, elen);
+    secure_memzero(entropy, sizeof(entropy));
+    touch_entropy_discard(touch);
+    touch = NULL;
+
+    char desc[48];
+    int  res = snprintf(desc, sizeof(desc), "touch screen %u-word (%u taps)", word_count, taps);
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
+    merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
+}
+
+static void on_touch_cancel(void) {
+    if (touch) {
+        touch_entropy_discard(touch);
+        touch = NULL;
+    }
+    go_source();
+}
+
+static void on_touch_screen(void) {
+    ASSERT_OR_DIE(!touch, "touch session already active");
+
+    lv_display_t* disp  = lv_display_get_default();
+    uint32_t      res_x = (uint32_t)lv_display_get_horizontal_resolution(disp);
+    uint32_t      res_y = (uint32_t)lv_display_get_vertical_resolution(disp);
+
+    touch = touch_entropy_begin(word_count, res_x, res_y);
+    ui_show_touch_screen(on_touch_tap, on_touch_cancel);
+}
 
 static void on_we_complete(void) {
     const char* txt = ui_word_entry_result(we_handle);
