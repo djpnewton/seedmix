@@ -2,9 +2,10 @@
 external/
 
 # Build artifacts
-build/
+build*/
 sdkconfig
 sdkconfig.old
+managed_components/
 *.o
 *.a
 *.elf

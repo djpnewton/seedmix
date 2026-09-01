@@ -1,0 +1,53 @@
+# seedmix default configuration - TTGO T-Display (classic ESP32).
+#
+# Board: 240x135 landscape ST7789 SPI display (Jade's TTGO T-Display settings),
+# no touchscreen, two physical buttons (GPIO 0 / GPIO 35), no camera, HW RNG.
+
+# -- Target / flash -----------------------------------------------------
+CONFIG_IDF_TARGET="esp32"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# -- LVGL (vendored component, configured via its own Kconfig) ---------
+CONFIG_LV_CONF_SKIP=y
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_MEM_SIZE_KILOBYTES=64
+CONFIG_LV_FONT_MONTSERRAT_14=y
+
+# -- seedmix: display ---------------------------------------------------
+CONFIG_SEEDMIX_DISPLAY_RESOLUTION_240_135=y
+CONFIG_SEEDMIX_DISPLAY_DRIVER_ST7789=y
+CONFIG_SEEDMIX_DISPLAY_SPI_HOST=2
+CONFIG_SEEDMIX_DISPLAY_SPI_CLK_GPIO=18
+CONFIG_SEEDMIX_DISPLAY_SPI_MOSI_GPIO=19
+CONFIG_SEEDMIX_DISPLAY_SPI_CS_GPIO=5
+CONFIG_SEEDMIX_DISPLAY_SPI_DC_GPIO=16
+CONFIG_SEEDMIX_DISPLAY_RST_GPIO=23
+CONFIG_SEEDMIX_DISPLAY_BACKLIGHT_GPIO=4
+CONFIG_SEEDMIX_DISPLAY_OFFSET_X=40
+CONFIG_SEEDMIX_DISPLAY_OFFSET_Y=53
+CONFIG_SEEDMIX_DISPLAY_INVERT_COLORS=y
+CONFIG_SEEDMIX_DISPLAY_SWAP_XY=y
+CONFIG_SEEDMIX_DISPLAY_MIRROR_X=y
+CONFIG_SEEDMIX_DISPLAY_MIRROR_Y=n
+
+# -- seedmix: touchscreen ----------------------------------------------
+# TTGO T-Display has no touchscreen
+CONFIG_SEEDMIX_TOUCHSCREEN_ENABLE=n
+
+# -- seedmix: camera ----------------------------------------------------
+# TTGO T-Display has no camera
+CONFIG_SEEDMIX_CAMERA_ENABLE=n
+
+# -- seedmix: physical buttons -----------------------------------------
+CONFIG_SEEDMIX_BUTTONS_ENABLE=y
+CONFIG_SEEDMIX_BUTTONS_COUNT=2
+CONFIG_SEEDMIX_BUTTON_0_GPIO=0
+CONFIG_SEEDMIX_BUTTON_1_GPIO=35
+CONFIG_SEEDMIX_BUTTON_2_GPIO=-1
+CONFIG_SEEDMIX_BUTTON_3_GPIO=-1
+CONFIG_SEEDMIX_BUTTONS_ACTIVE_LOW=y
+CONFIG_SEEDMIX_BUTTONS_DEBOUNCE_MS=30
+
+# -- seedmix: entropy / TRNG -------------------------------------------
+# Hardware RNG
+CONFIG_SEEDMIX_TRNG_SOURCE_HARDWARE=y

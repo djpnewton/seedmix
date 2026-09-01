@@ -47,7 +47,7 @@ if [ "$#" -gt 0 ]; then
 else
     mapfile -t FILES < <(
         find "$PROJECT_ROOT" \
-            \( -path "$PROJECT_ROOT/build" -o \
+            \( -path "$PROJECT_ROOT/build*" -o \
                -path "$PROJECT_ROOT/external" -o \
                -path "$PROJECT_ROOT/lvgl" \) -prune -o \
             \( -name '*.c' -o -name '*.h' \) -print

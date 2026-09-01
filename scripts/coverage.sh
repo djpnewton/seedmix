@@ -3,11 +3,11 @@
 # Usage:
 #   ./scripts/coverage.sh
 # Builds with coverage instrumentation, runs the tests, and writes an HTML
-# report to build/coverage/index.html (plus a text summary to stdout).
+# report to build_linux/coverage/index.html (plus a text summary to stdout).
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="${PROJECT_ROOT}/build"
+BUILD_DIR="${PROJECT_ROOT}/build_linux"
 
 check_dep() {
     if ! command -v "$1" &>/dev/null; then
