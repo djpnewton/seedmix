@@ -48,6 +48,22 @@ Preset board configs can live next to `sdkconfig.defaults` (e.g.
 SDKCONFIG_DEFAULTS="sdkconfig.defaults.ttgo" ./scripts/build_esp32.sh
 ```
 
+## Hardening
+
+The firmware is hardened:
+
+- **No radio** - the build is configured with `CONFIG_APP_NO_BLOBS=y`, which
+  drops the WiFi, Bluetooth and RF-PHY binary blobs, so the device has no
+  radio capability and cannot transmit or receive wirelessly.  `main_esp32.c`
+  contains a compile-time `#error`, so the build fails if the blobs are
+  re-enabled.
+- **No flash storage** - the project uses the custom partition table
+  `partitions_hardened.csv`, which contains only the `factory` app partition
+  (no NVS, no OTA, no PHY-init and no data partition), and PHY calibration
+  storage in NVS is disabled (`CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=n`).
+  NVS is never initialised, so secrets are only ever held in RAM and are wiped
+  on power-off.
+
 ## What's implemented so far
 
 - Display bring-up via `esp_lcd` ST7789 + LVGL flush callback.
