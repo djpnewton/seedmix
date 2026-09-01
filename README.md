@@ -23,7 +23,7 @@ chmod +x scripts/build.sh
 
 ### 3. Run
 ```bash
-./build/seedmix
+./build_linux/seedmix
 ```
 
 A 480×320 window opens with a "Generate" button that creates a BIP39 mnemonic.

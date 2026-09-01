@@ -43,7 +43,7 @@ jobs:
             seedmix_touch_tests \
             seedmix_seedqr_tests \
             seedmix_qr_tests; do
-            test -x "build/tests/$exe"
+            test -x "build_linux/tests/$exe"
           done
 
   coverage:
@@ -75,7 +75,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: build/coverage/
+          path: build_linux/coverage/
 
   sanitizers:
     runs-on: ubuntu-22.04

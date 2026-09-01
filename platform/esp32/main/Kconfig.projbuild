@@ -1,0 +1,326 @@
+# seedmix project hardware configuration.
+#
+# ESP-IDF automatically sources every component's Kconfig.projbuild, so these
+# options appear in `idf.py menuconfig` under "seedmix Hardware".
+
+menu "seedmix Hardware"
+
+    # ------------------------------------------------------------------
+    menu "Display"
+
+        choice SEEDMIX_DISPLAY_RESOLUTION
+            prompt "Screen resolution"
+            default SEEDMIX_DISPLAY_RESOLUTION_240_135
+            config SEEDMIX_DISPLAY_RESOLUTION_240_135
+                bool "240 x 135 (TTGO T-Display landscape)"
+            config SEEDMIX_DISPLAY_RESOLUTION_135_240
+                bool "135 x 240 (portrait)"
+            config SEEDMIX_DISPLAY_RESOLUTION_240_240
+                bool "240 x 240"
+            config SEEDMIX_DISPLAY_RESOLUTION_240_320
+                bool "240 x 320"
+            config SEEDMIX_DISPLAY_RESOLUTION_CUSTOM
+                bool "Custom"
+        endchoice
+
+        # Derived width/height for the preset resolutions (hidden).
+        config SEEDMIX_DISPLAY_WIDTH
+            int
+            default 240 if SEEDMIX_DISPLAY_RESOLUTION_240_135
+            default 135 if SEEDMIX_DISPLAY_RESOLUTION_135_240
+            default 240 if SEEDMIX_DISPLAY_RESOLUTION_240_240
+            default 240 if SEEDMIX_DISPLAY_RESOLUTION_240_320
+
+        config SEEDMIX_DISPLAY_HEIGHT
+            int
+            default 135 if SEEDMIX_DISPLAY_RESOLUTION_240_135
+            default 240 if SEEDMIX_DISPLAY_RESOLUTION_135_240
+            default 240 if SEEDMIX_DISPLAY_RESOLUTION_240_240
+            default 320 if SEEDMIX_DISPLAY_RESOLUTION_240_320
+
+        config SEEDMIX_DISPLAY_WIDTH_CUSTOM
+            int "Custom display width (px)"
+            default 240
+            range 1 1024
+            depends on SEEDMIX_DISPLAY_RESOLUTION_CUSTOM
+
+        config SEEDMIX_DISPLAY_HEIGHT_CUSTOM
+            int "Custom display height (px)"
+            default 320
+            range 1 1024
+            depends on SEEDMIX_DISPLAY_RESOLUTION_CUSTOM
+
+        choice SEEDMIX_DISPLAY_DRIVER
+            prompt "Display controller"
+            default SEEDMIX_DISPLAY_DRIVER_ST7789
+            config SEEDMIX_DISPLAY_DRIVER_ST7789
+                bool "ST7789 (SPI)"
+            config SEEDMIX_DISPLAY_DRIVER_ILI9341
+                bool "ILI9341 (SPI, needs espressif/esp_lcd_ili9341)"
+            config SEEDMIX_DISPLAY_DRIVER_ST7735
+                bool "ST7735 (SPI, needs espressif/esp_lcd_st7735)"
+            config SEEDMIX_DISPLAY_DRIVER_NONE
+                bool "None (headless)"
+        endchoice
+
+        config SEEDMIX_DISPLAY_SPI_HOST
+            int "Display SPI peripheral (1=SPI2, 2=SPI3)"
+            default 2
+            range 1 2
+
+        config SEEDMIX_DISPLAY_SPI_CLK_GPIO
+            int "Display SPI clock (SCLK) GPIO"
+            default 18
+            range -1 48
+
+        config SEEDMIX_DISPLAY_SPI_MOSI_GPIO
+            int "Display SPI MOSI (SDA) GPIO"
+            default 19
+            range -1 48
+
+        config SEEDMIX_DISPLAY_SPI_CS_GPIO
+            int "Display chip-select (CS) GPIO"
+            default 5
+            range -1 48
+
+        config SEEDMIX_DISPLAY_SPI_DC_GPIO
+            int "Display data/command (DC) GPIO"
+            default 16
+            range -1 48
+
+        config SEEDMIX_DISPLAY_RST_GPIO
+            int "Display reset (RST) GPIO (-1 = none)"
+            default 23
+            range -1 48
+
+        config SEEDMIX_DISPLAY_BACKLIGHT_GPIO
+            int "Display backlight GPIO (-1 = none)"
+            default 4
+            range -1 48
+
+        config SEEDMIX_DISPLAY_OFFSET_X
+            int "Panel window X offset (px)"
+            default 0
+            help
+                Offset of the visible window inside the controller RAM
+
+        config SEEDMIX_DISPLAY_OFFSET_Y
+            int "Panel window Y offset (px)"
+            default 0
+            help
+                Vertical window offset.
+
+        config SEEDMIX_DISPLAY_INVERT_COLORS
+            bool "Invert display colors"
+            default y
+
+        config SEEDMIX_DISPLAY_SWAP_XY
+            bool "Swap X and Y (portrait/landscape rotation)"
+            default y
+
+        config SEEDMIX_DISPLAY_MIRROR_X
+            bool "Mirror horizontally"
+            default y
+
+        config SEEDMIX_DISPLAY_MIRROR_Y
+            bool "Mirror vertically"
+            default n
+    endmenu
+
+    # ------------------------------------------------------------------
+    menu "Touchscreen"
+
+        config SEEDMIX_TOUCHSCREEN_ENABLE
+            bool "Enable touchscreen"
+            default n
+
+        choice SEEDMIX_TOUCHSCREEN_DRIVER
+            prompt "Touchscreen controller"
+            default SEEDMIX_TOUCHSCREEN_DRIVER_XPT2046
+            depends on SEEDMIX_TOUCHSCREEN_ENABLE
+            config SEEDMIX_TOUCHSCREEN_DRIVER_XPT2046
+                bool "XPT2046 (SPI, resistive)"
+            config SEEDMIX_TOUCHSCREEN_DRIVER_FT5X06
+                bool "FT5x06 / GT911 (I2C, capacitive)"
+        endchoice
+
+        config SEEDMIX_TOUCHSCREEN_SPI_CS_GPIO
+            int "Touch SPI chip-select (CS) GPIO"
+            default -1
+            range -1 48
+            depends on SEEDMIX_TOUCHSCREEN_DRIVER_XPT2046
+
+        config SEEDMIX_TOUCHSCREEN_IRQ_GPIO
+            int "Touch interrupt (IRQ) GPIO (-1 = poll)"
+            default -1
+            range -1 48
+            depends on SEEDMIX_TOUCHSCREEN_ENABLE
+
+        config SEEDMIX_TOUCHSCREEN_I2C_SDA_GPIO
+            int "Touch I2C SDA GPIO"
+            default 21
+            range -1 48
+            depends on SEEDMIX_TOUCHSCREEN_DRIVER_FT5X06
+
+        config SEEDMIX_TOUCHSCREEN_I2C_SCL_GPIO
+            int "Touch I2C SCL GPIO"
+            default 22
+            range -1 48
+            depends on SEEDMIX_TOUCHSCREEN_DRIVER_FT5X06
+
+        config SEEDMIX_TOUCHSCREEN_I2C_ADDR
+            hex "Touch I2C address"
+            default 0x38
+            depends on SEEDMIX_TOUCHSCREEN_DRIVER_FT5X06
+
+        config SEEDMIX_TOUCHSCREEN_SWAP_XY
+            bool "Swap touch X and Y"
+            default n
+            depends on SEEDMIX_TOUCHSCREEN_ENABLE
+
+        config SEEDMIX_TOUCHSCREEN_INVERT_X
+            bool "Invert touch X axis"
+            default n
+            depends on SEEDMIX_TOUCHSCREEN_ENABLE
+
+        config SEEDMIX_TOUCHSCREEN_INVERT_Y
+            bool "Invert touch Y axis"
+            default n
+            depends on SEEDMIX_TOUCHSCREEN_ENABLE
+    endmenu
+
+    # ------------------------------------------------------------------
+    menu "Camera"
+
+        config SEEDMIX_CAMERA_ENABLE
+            bool "Enable camera"
+            default n
+            help
+                Enables the camera entropy source.  Requires the esp_camera
+                component and a camera module wired to the parallel camera
+                interface.  The TTGO T-Display has no camera.
+
+        choice SEEDMIX_CAMERA_MODEL
+            prompt "Camera sensor model"
+            default SEEDMIX_CAMERA_MODEL_OV2640
+            depends on SEEDMIX_CAMERA_ENABLE
+            config SEEDMIX_CAMERA_MODEL_OV2640
+                bool "OV2640 (2MP)"
+            config SEEDMIX_CAMERA_MODEL_OV7670
+                bool "OV7670 (VGA)"
+        endchoice
+
+        config SEEDMIX_CAMERA_PIN_XCLK
+            int "Camera XCLK GPIO"
+            default 32
+            range -1 48
+            depends on SEEDMIX_CAMERA_ENABLE
+
+        config SEEDMIX_CAMERA_PIN_PCLK
+            int "Camera PCLK GPIO"
+            default 22
+            range -1 48
+            depends on SEEDMIX_CAMERA_ENABLE
+
+        config SEEDMIX_CAMERA_PIN_VSYNC
+            int "Camera VSYNC GPIO"
+            default 25
+            range -1 48
+            depends on SEEDMIX_CAMERA_ENABLE
+
+        config SEEDMIX_CAMERA_PIN_HREF
+            int "Camera HREF GPIO"
+            default 23
+            range -1 48
+            depends on SEEDMIX_CAMERA_ENABLE
+
+        config SEEDMIX_CAMERA_PIN_SIOD
+            int "Camera SCCB SIOD GPIO"
+            default 26
+            range -1 48
+            depends on SEEDMIX_CAMERA_ENABLE
+
+        config SEEDMIX_CAMERA_PIN_SIOC
+            int "Camera SCCB SIOC GPIO"
+            default 27
+            range -1 48
+            depends on SEEDMIX_CAMERA_ENABLE
+
+        config SEEDMIX_CAMERA_PIN_DATA_BASE
+            int "Camera D0 GPIO (D1..D7 are consecutive)"
+            default 4
+            range -1 48
+            depends on SEEDMIX_CAMERA_ENABLE
+    endmenu
+
+    # ------------------------------------------------------------------
+    menu "Physical buttons"
+
+        config SEEDMIX_BUTTONS_ENABLE
+            bool "Enable physical buttons"
+            default n
+            help
+                Maps GPIO buttons to LVGL keypad events so the UI can be
+                driven without a touchscreen.  TTGO T-Display has two
+                buttons: GPIO 0 (top) and GPIO 35 (bottom).
+
+        config SEEDMIX_BUTTONS_COUNT
+            int "Number of buttons"
+            default 2
+            range 0 4
+            depends on SEEDMIX_BUTTONS_ENABLE
+
+        config SEEDMIX_BUTTON_0_GPIO
+            int "Button 0 GPIO (-1 = none)"
+            default 0
+            range -1 48
+            depends on SEEDMIX_BUTTONS_ENABLE
+
+        config SEEDMIX_BUTTON_1_GPIO
+            int "Button 1 GPIO (-1 = none)"
+            default 35
+            range -1 48
+            depends on SEEDMIX_BUTTONS_ENABLE
+
+        config SEEDMIX_BUTTON_2_GPIO
+            int "Button 2 GPIO (-1 = none)"
+            default -1
+            range -1 48
+            depends on SEEDMIX_BUTTONS_ENABLE
+
+        config SEEDMIX_BUTTON_3_GPIO
+            int "Button 3 GPIO (-1 = none)"
+            default -1
+            range -1 48
+            depends on SEEDMIX_BUTTONS_ENABLE
+
+        config SEEDMIX_BUTTONS_ACTIVE_LOW
+            bool "Buttons are active-low (enable internal pull-up)"
+            default y
+            depends on SEEDMIX_BUTTONS_ENABLE
+
+        config SEEDMIX_BUTTONS_DEBOUNCE_MS
+            int "Button debounce time (ms)"
+            default 30
+            range 5 200
+            depends on SEEDMIX_BUTTONS_ENABLE
+    endmenu
+
+    # ------------------------------------------------------------------
+    menu "Entropy / TRNG"
+
+        choice SEEDMIX_TRNG_SOURCE
+            prompt "Random number source"
+            default SEEDMIX_TRNG_SOURCE_HARDWARE
+            config SEEDMIX_TRNG_SOURCE_HARDWARE
+                bool "ESP32 hardware RNG (esp_fill_random)"
+                help
+                    Uses the on-chip hardware RNG via esp_fill_random().
+                    This works WITHOUT enabling the WiFi or Bluetooth
+                    radio - no RF is involved.
+            config SEEDMIX_TRNG_SOURCE_DISABLED
+                bool "Disabled (hal_get_random aborts)"
+        endchoice
+    endmenu
+
+endmenu

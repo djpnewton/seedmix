@@ -6,7 +6,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="${PROJECT_ROOT}/build"
+BUILD_DIR="${PROJECT_ROOT}/build_linux"
 LIBWALLY_INC="${BUILD_DIR}/libwally-install/include"
 LIBWALLY_LIBS=(
     "${BUILD_DIR}/libwally-install/lib/libwallycore.a"

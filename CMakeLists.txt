@@ -1,4 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
+
+if(ESP_PLATFORM)
+    message(FATAL_ERROR
+        "This is the Linux prototype build.\n"
+        "The ESP32 firmware is a separate project - build it with:\n"
+        "    cd platform/esp32 && idf.py build")
+endif()
+
 project(seedmix VERSION 0.1.0 LANGUAGES C)
 
 option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
@@ -7,14 +15,13 @@ option(ENABLE_COVERAGE "Enable code coverage instrumentation (gcov/lcov)" OFF)
 set(ENABLE_SANITIZERS "" CACHE STRING "Comma-separated sanitizers for tests (e.g. address,undefined)")
 
 # -- Platform Detection -----------------------------------------------------
-# ESP-IDF sets CMAKE_SYSTEM_NAME when building; otherwise we assume Linux
+# This top-level CMakeLists.txt builds the Linux/SDL2 prototype only.
+# The ESP32 firmware is a separate ESP-IDF project built with idf.py
 if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
-    set(PLATFORM "esp32")
-    message(STATUS "Building for ESP32")
-else()
-    set(PLATFORM "linux")
-    message(STATUS "Building for Linux (prototype)")
+    message(FATAL_ERROR "ESP32 builds use ESP-IDF")
 endif()
+set(PLATFORM "linux")
+message(STATUS "Building for Linux (prototype)")
 
 # -- Common Source Files ----------------------------------------------------
 set(COMMON_SOURCES
@@ -39,11 +46,7 @@ set(COMMON_SOURCES
 )
 
 # -- Platform-Specific Setup ------------------------------------------------
-if(PLATFORM STREQUAL "linux")
-    include(${CMAKE_SOURCE_DIR}/platform/linux/linux.cmake)
-elseif(PLATFORM STREQUAL "esp32")
-    include(${CMAKE_SOURCE_DIR}/platform/esp32/esp32.cmake)
-endif()
+include(${CMAKE_SOURCE_DIR}/platform/linux/linux.cmake)
 
 # -- Tests -------------------------------------------------------------------
 if(BUILD_TESTS)
