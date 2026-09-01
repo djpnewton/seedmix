@@ -40,6 +40,8 @@ add_library(seedmix_test_util STATIC
     ${CMAKE_SOURCE_DIR}/main/crypto/secure_stack.c
     ${CMAKE_SOURCE_DIR}/main/crypto/mnemonic.c
     ${CMAKE_SOURCE_DIR}/main/crypto/bip39_wordlist.c
+    ${CMAKE_SOURCE_DIR}/main/crypto/seedqr.c
+    ${CMAKE_SOURCE_DIR}/main/qr/qr.c
     ${CMAKE_SOURCE_DIR}/main/crypto/touch.c
     ${CMAKE_SOURCE_DIR}/main/crypto/dice.c
     ${CMAKE_SOURCE_DIR}/main/crypto/coin.c
@@ -51,10 +53,12 @@ target_include_directories(seedmix_test_util PUBLIC
     ${CMAKE_SOURCE_DIR}/main
     ${CMAKE_SOURCE_DIR}/main/util
     ${CMAKE_SOURCE_DIR}/main/crypto
+    ${CMAKE_SOURCE_DIR}/main/qr
 )
 
 # libwally (IMPORTED, GLOBAL) is defined by platform/linux/linux.cmake
-target_link_libraries(seedmix_test_util PUBLIC libwally)
+# qrencode/quirc are defined by cmake/BuildQrLibs.cmake
+target_link_libraries(seedmix_test_util PUBLIC libwally qrencode quirc)
 
 target_compile_options(seedmix_test_util PRIVATE
     -Wall -Wextra -Wpedantic
@@ -83,6 +87,8 @@ seedmix_add_test(seedmix_bip39_wordlist_tests test_bip39_wordlist.c)
 seedmix_add_test(seedmix_kat_tests            test_kat.c)
 seedmix_add_test(seedmix_fatal_tests          test_fatal.c)
 seedmix_add_test(seedmix_touch_tests          test_touch.c)
+seedmix_add_test(seedmix_seedqr_tests         test_seedqr.c)
+seedmix_add_test(seedmix_qr_tests             test_qr.c)
 
 # Convenience target built by scripts/test.sh
 get_property(_test_exes GLOBAL PROPERTY SEEDMIX_TEST_EXECUTABLES)

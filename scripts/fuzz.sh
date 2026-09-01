@@ -67,3 +67,15 @@ run_fuzzer fuzz_wordlist \
     "${PROJECT_ROOT}/main/crypto/bip39_wordlist.c" \
     "${PROJECT_ROOT}/fuzz/stubs.c" \
     "${PROJECT_ROOT}/fuzz/fuzz_wordlist.c"
+
+SEEDQR_DEPS=(
+    "${PROJECT_ROOT}/main/crypto/seedqr.c"
+    "${PROJECT_ROOT}/main/crypto/bip39_wordlist.c"
+    "${PROJECT_ROOT}/main/crypto/mnemonic.c"
+    "${PROJECT_ROOT}/main/crypto/secure_stack.c"
+    "${PROJECT_ROOT}/main/util/utils.c"
+    "${PROJECT_ROOT}/main/util/log.c"
+    "${PROJECT_ROOT}/fuzz/stubs.c"
+)
+
+run_fuzzer fuzz_seedqr_decode "${SEEDQR_DEPS[@]}" "${PROJECT_ROOT}/fuzz/fuzz_seedqr_decode.c"

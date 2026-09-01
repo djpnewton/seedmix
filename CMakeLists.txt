@@ -31,6 +31,8 @@ set(COMMON_SOURCES
     main/crypto/coin.c
     main/crypto/secure_stack.c
     main/crypto/bip39_wordlist.c
+    main/crypto/seedqr.c
+    main/qr/qr.c
     main/util/error.c
     main/util/log.c
     main/util/utils.c

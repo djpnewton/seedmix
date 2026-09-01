@@ -7,9 +7,11 @@
 #include "crypto/coin.h"
 #include "crypto/dice.h"
 #include "crypto/mnemonic.h"
+#include "crypto/seedqr.h"
 #include "crypto/touch.h"
 #include "hal.h"
 #include "lvgl.h"
+#include "qr/qr.h"
 #include "ui/log.h"
 #include "ui/ui.h"
 #include "ui/word_entry.h"
@@ -22,8 +24,9 @@
 #include <string.h>
 
 /* -- Workflow state --------------------------------------------------- */
-static mnemonic_t* current    = NULL;
-static unsigned    word_count = 12;
+static mnemonic_t* current     = NULL;
+static unsigned    word_count  = 12;
+static qr_grid_t   exported_qr = {0};
 
 /* -- Forward declarations --------------------------------------------- */
 static void on_other_source(void);
@@ -31,6 +34,10 @@ static void on_camera_image(void);
 static void on_camera_use(void);
 static void on_camera_cancel(void);
 static void on_scan_qr(void);
+static void on_qr_scan(void);
+static void on_qr_scan_cancel(void);
+static void on_export_seedqr(void);
+static void on_export_done(void);
 static void on_dice_rolls(void);
 static void on_coin_flips(void);
 static void on_touch_screen(void);
@@ -39,6 +46,7 @@ static void on_show_state(void);
 static void go_back_source(void);
 static void go_source(void);
 static void on_finish(void);
+static void on_finish_done(void);
 static void show_merge_screen(mnemonic_t* new_m, const char* source_desc);
 static void on_new_wallet(lv_event_t* e);
 static void on_test_error(lv_event_t* e);
@@ -64,7 +72,7 @@ static void merge_or_reject(mnemonic_t* m, mnemonic_type_t result_type, const ch
     } else {
         current = m;
         ui_log_add("started with %s", source_desc);
-        ui_show_mnemonic(mnemonic_words(current), result_type, go_source);
+        ui_show_mnemonic(mnemonic_words(current), result_type, go_source, NULL);
     }
 }
 
@@ -95,7 +103,7 @@ static void on_merge_done(void) {
     current     = mnemonic_combine(current, pending_new);
     pending_new = NULL;
     ui_log_add("merged with %s", pending_desc);
-    ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_MERGED, go_source);
+    ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_MERGED, go_source, NULL);
 }
 
 static void show_merge_screen(mnemonic_t* new_m, const char* source_desc) {
@@ -342,7 +350,110 @@ static void on_camera_use(void) {
     merge_or_reject(m, MNEMONIC_TYPE_GENERATED, desc);
 }
 
-static void on_scan_qr(void) { FATAL("Scan QR not yet implemented."); }
+static void rgb565_to_gray(const uint8_t* rgb565, uint32_t w, uint32_t h, uint8_t* gray) {
+    const uint16_t* px = (const uint16_t*)rgb565;
+    uint32_t        n  = w * h;
+    for (uint32_t i = 0; i < n; i++) {
+        uint16_t c = px[i];
+        uint32_t r = ((c >> 11) & 0x1F) * 255 / 31;
+        uint32_t g = ((c >> 5) & 0x3F) * 255 / 63;
+        uint32_t b = (c & 0x1F) * 255 / 31;
+        gray[i]    = (uint8_t)((r * 299 + g * 587 + b * 114) / 1000);
+    }
+}
+
+static void on_scan_qr(void) {
+    if (!hal_camera_available()) {
+        FATAL("Camera not available.");
+    }
+    camera = hal_camera_open();
+    ASSERT_OR_DIE(camera, "Failed to open camera.");
+    ui_show_qr_scan(on_qr_scan, on_qr_scan_cancel);
+    camera_timer = lv_timer_create(camera_feed_tick, 120, NULL);
+}
+
+static void on_qr_scan_cancel(void) {
+    camera_feed_stop();
+    ui_show_other_source(on_camera_image, on_scan_qr, on_dice_rolls, on_coin_flips, on_touch_screen,
+                         go_source);
+}
+
+static void on_qr_scan(void) {
+    if (camera_timer) {
+        lv_timer_delete(camera_timer);
+        camera_timer = NULL;
+    }
+    if (camera) {
+        hal_camera_close(camera);
+        camera = NULL;
+    }
+    if (!camera_rgb565 || camera_w == 0 || camera_h == 0) {
+        camera_release();
+        FATAL("No camera image captured yet.");
+    }
+
+    uint8_t* gray = malloc((size_t)camera_w * camera_h);
+    ASSERT_OR_DIE(gray, "out of memory");
+    rgb565_to_gray(camera_rgb565, camera_w, camera_h, gray);
+
+    uint8_t     payload[256];
+    size_t      plen = 0;
+    mnemonic_t* m    = NULL;
+
+    if (qr_decode(gray, camera_w, camera_h, payload, sizeof(payload), &plen)) {
+        if (plen == SEEDQR_STANDARD_12_DIGITS || plen == SEEDQR_STANDARD_24_DIGITS) {
+            char digits[SEEDQR_STANDARD_24_DIGITS + 1];
+            memcpy(digits, payload, plen);
+            digits[plen] = '\0';
+            m            = seedqr_standard_decode(digits);
+        } else if (plen == 16 || plen == 32) {
+            m = seedqr_compact_decode(payload, plen);
+        }
+    }
+
+    secure_memzero(gray, (size_t)camera_w * camera_h);
+    free(gray);
+    camera_release();
+
+    if (!m) {
+        ui_show_msg("No valid SeedQR found");
+        ui_delay_ms(1500);
+        on_qr_scan_cancel();
+        return;
+    }
+
+    unsigned wc = (mnemonic_entropy_size(m) == 32) ? 24 : 12;
+    char     desc[48];
+    int      res = snprintf(desc, sizeof(desc), "scanned %u-word SeedQR", wc);
+    ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(desc), "description string too long");
+    merge_or_reject(m, MNEMONIC_TYPE_ENTERED, desc);
+}
+
+static void on_export_seedqr(void) {
+    if (!current) {
+        ui_go_main();
+        return;
+    }
+
+    uint8_t entropy[32];
+    size_t  n = seedqr_compact_encode(current, entropy, sizeof(entropy));
+    ASSERT_OR_DIE(n == 16 || n == 32, "unexpected entropy length");
+
+    if (!qr_encode(entropy, n, QR_MODE_BYTE, &exported_qr)) {
+        secure_memzero(entropy, sizeof(entropy));
+        FATAL("SeedQR encode failed");
+    }
+    secure_memzero(entropy, sizeof(entropy));
+
+    ui_show_seedqr(exported_qr.cells, exported_qr.size, on_export_done);
+}
+
+static void on_export_done(void) {
+    ui_seedqr_cleanup();
+    qr_grid_free(&exported_qr);
+    ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_FINAL, on_finish_done,
+                     on_export_seedqr);
+}
 
 /* -- Dice roll entropy source ---------------------------------------- */
 static dice_entropy_t* dice = NULL;
@@ -546,19 +657,24 @@ static void on_show_state(void) {
     ui_show_state(go_back_source, current ? mnemonic_words(current) : NULL);
 }
 
+static void on_finish_done(void) {
+    if (we_handle) {
+        ui_word_entry_discard(we_handle);
+        we_handle = NULL;
+    }
+    mnemonic_discard(current);
+    current = NULL;
+    ui_go_main();
+}
+
 static void on_finish(void) {
     if (!current) {
         ui_go_main();
         return;
     }
-    ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_FINAL, ui_go_main);
+    ui_show_mnemonic(mnemonic_words(current), MNEMONIC_TYPE_FINAL, on_finish_done,
+                     on_export_seedqr);
     ui_log_add("finished");
-    mnemonic_discard(current);
-    current = NULL;
-    if (we_handle) {
-        ui_word_entry_discard(we_handle);
-        we_handle = NULL;
-    }
 }
 
 /* -- Entry: "New Wallet" button --------------------------------------- */

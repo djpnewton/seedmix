@@ -7,6 +7,7 @@
 #define BIP39_WORDLIST_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,16 @@ void bip39_wordlist_init(void);
  * @return Number of matches found.
  */
 size_t bip39_wordlist_lookup(const char* prefix, const char** matches);
+
+/**
+ * @brief Return the word at 0-based @p index, or NULL if out of range.
+ */
+const char* bip39_wordlist_word(size_t index);
+
+/**
+ * @brief Return the 0-based BIP39 index of @p word, or SIZE_MAX if not found.
+ */
+size_t bip39_wordlist_index(const char* word);
 
 #ifdef __cplusplus
 }
