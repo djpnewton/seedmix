@@ -9,6 +9,9 @@ find_package(SDL2 REQUIRED)
 # Build libwally from external/libwally-core (submodule)
 include(BuildLibWally)
 
+# Build libqrencode (QR encoder) + quirc (QR decoder)
+include(BuildQrLibs)
+
 # -- LVGL Library -------------------------------------------------------
 # Points to your local LVGL clone - adjust or use FetchContent
 set(LVGL_DIR ${CMAKE_SOURCE_DIR}/external/lvgl CACHE PATH "Path to LVGL source")
@@ -43,6 +46,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/main
     ${CMAKE_SOURCE_DIR}/main/ui
     ${CMAKE_SOURCE_DIR}/main/crypto
+    ${CMAKE_SOURCE_DIR}/main/qr
     ${CMAKE_SOURCE_DIR}/main/util
     ${CMAKE_SOURCE_DIR}/platform/linux
     ${LVGL_DIR}
@@ -57,7 +61,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 # libwally is always built from the submodule on Linux
-target_link_libraries(${PROJECT_NAME} PRIVATE libwally)
+target_link_libraries(${PROJECT_NAME} PRIVATE libwally qrencode quirc)
 
 # -- Compiler Flags -----------------------------------------------------
 target_compile_options(${PROJECT_NAME} PRIVATE

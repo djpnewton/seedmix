@@ -40,7 +40,9 @@ jobs:
             seedmix_bip39_wordlist_tests \
             seedmix_kat_tests \
             seedmix_fatal_tests \
-            seedmix_touch_tests; do
+            seedmix_touch_tests \
+            seedmix_seedqr_tests \
+            seedmix_qr_tests; do
             test -x "build/tests/$exe"
           done
 

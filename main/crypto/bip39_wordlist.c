@@ -8,6 +8,7 @@
 
 #include <ctype.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <wally_bip39.h>
 
@@ -43,4 +44,19 @@ size_t bip39_wordlist_lookup(const char* prefix, const char** matches) {
         }
     }
     return count;
+}
+
+const char* bip39_wordlist_word(size_t index) {
+    if (index >= BIP39_WORD_COUNT) return NULL;
+    bip39_wordlist_init();
+    return wordlist[index];
+}
+
+size_t bip39_wordlist_index(const char* word) {
+    if (!word || !*word) return SIZE_MAX;
+    bip39_wordlist_init();
+    for (size_t i = 0; i < BIP39_WORD_COUNT; i++) {
+        if (strcmp(wordlist[i], word) == 0) return i;
+    }
+    return SIZE_MAX;
 }

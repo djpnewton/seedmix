@@ -12,6 +12,7 @@
 #include "util/error.h"
 #include "util/utils.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifndef ESP_PLATFORM
@@ -24,8 +25,11 @@ static lv_obj_t* entered_ta = NULL;
 static char      entered_buf[512];
 static lv_obj_t* prev_screen = NULL; // track for deferred cleanup
 
-static lv_obj_t*      camera_img = NULL; // live camera feed image widget
-static lv_image_dsc_t camera_dsc;        // descriptor backing the live feed
+static lv_obj_t*      camera_img = NULL;       // live camera feed image widget
+static lv_image_dsc_t camera_dsc;              // descriptor backing the live feed
+static lv_image_dsc_t seedqr_dsc;              // descriptor backing the SeedQR image
+static uint8_t*       seedqr_buf       = NULL; // RGB565 buffer for the SeedQR image
+static size_t         seedqr_buf_bytes = 0;
 
 // Recursively zero the text of every label under `obj`.  lv_label_set_text()
 // copies strings into LVGL-allocated memory; freeing the object does NOT wipe
@@ -553,7 +557,96 @@ void ui_camera_feed_update(const uint8_t* rgb565, uint32_t w, uint32_t h) {
     lv_image_set_inner_align(camera_img, LV_IMAGE_ALIGN_STRETCH);
 }
 
-void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok) {
+void ui_show_seedqr(const uint8_t* cells, uint32_t size, ui_cb_t on_done) {
+    ASSERT_OR_DIE(cells, "null cells");
+    ASSERT_OR_DIE(on_done, "null on_done");
+
+    lv_obj_t* s = ui_make_screen();
+
+    // Title on the right so the QR can use the full screen height.
+    // Match the Done button's right edge (-30) so the column lines up.
+    lv_obj_t* t = lv_label_create(s);
+    lv_label_set_text(t, "SeedQR");
+    lv_obj_set_style_text_color(t, lv_color_white(), 0);
+    lv_obj_set_style_text_font(t, &lv_font_montserrat_28, 0);
+    lv_obj_align(t, LV_ALIGN_TOP_RIGHT, -35, 15);
+
+    // White quiet-zone border (4 modules), then the data modules
+    uint32_t border = 4;
+    uint32_t total  = size + 2 * border;
+    uint32_t scale  = 300 / total; // full screen height
+    if (scale < 4) scale = 4;
+    uint32_t px = scale * total;
+
+    // Build one RGB565 buffer and show it as a single image
+    seedqr_buf_bytes = (size_t)px * px * 2;
+    seedqr_buf       = calloc(seedqr_buf_bytes, 1);
+    ASSERT_OR_DIE(seedqr_buf, "out of memory for SeedQR buffer");
+    memset(seedqr_buf, 0xFF, seedqr_buf_bytes); // white (0xFFFF)
+
+    uint16_t* dst = (uint16_t*)seedqr_buf;
+    uint32_t  off = border * scale;
+    for (uint32_t y = 0; y < size; y++) {
+        for (uint32_t x = 0; x < size; x++) {
+            if (!cells[(size_t)y * size + x]) continue; // already white
+            uint32_t by = off + y * scale;
+            uint32_t bx = off + x * scale;
+            for (uint32_t dy = 0; dy < scale; dy++) {
+                for (uint32_t dx = 0; dx < scale; dx++) {
+                    dst[(size_t)(by + dy) * px + (bx + dx)] = 0x0000;
+                }
+            }
+        }
+    }
+
+    memset(&seedqr_dsc, 0, sizeof(seedqr_dsc));
+    seedqr_dsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
+    seedqr_dsc.header.cf     = LV_COLOR_FORMAT_RGB565;
+    seedqr_dsc.header.w      = (uint16_t)px;
+    seedqr_dsc.header.h      = (uint16_t)px;
+    seedqr_dsc.header.stride = (uint16_t)(px * 2);
+    seedqr_dsc.data_size     = (uint32_t)seedqr_buf_bytes;
+    seedqr_dsc.data          = seedqr_buf;
+
+    lv_obj_t* img = lv_image_create(s);
+    lv_image_set_src(img, &seedqr_dsc);
+    lv_obj_align(img, LV_ALIGN_LEFT_MID, 10, 0);
+
+    ui_add_btn(s, "Done", on_done, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+
+    ui_swap_screen(s);
+}
+
+void ui_seedqr_cleanup(void) {
+    if (seedqr_buf) {
+        secure_memzero(seedqr_buf, seedqr_buf_bytes);
+        free(seedqr_buf);
+        seedqr_buf = NULL;
+    }
+}
+
+void ui_show_qr_scan(ui_cb_t on_scan, ui_cb_t on_cancel) {
+    ASSERT_OR_DIE(on_scan, "null on_scan");
+    ASSERT_OR_DIE(on_cancel, "null on_cancel");
+
+    lv_obj_t* s = ui_make_screen();
+    ui_add_title(s, "Scan QR");
+
+    memset(&camera_dsc, 0, sizeof(camera_dsc));
+    camera_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    camera_dsc.header.cf    = LV_COLOR_FORMAT_RGB565;
+
+    camera_img = lv_image_create(s);
+    lv_obj_set_size(camera_img, 300, 200);
+    lv_obj_align(camera_img, LV_ALIGN_TOP_MID, 0, 45);
+
+    ui_add_btn(s, "Scan", on_scan, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_LEFT, 20, -10);
+    ui_add_btn(s, "Cancel", on_cancel, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
+
+    ui_swap_screen(s);
+}
+
+void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok, ui_cb_t on_export) {
     ASSERT_OR_DIE(words, "null words");
     ASSERT_OR_DIE(on_ok, "null on_ok");
 
@@ -593,8 +686,13 @@ void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok) {
     ui_mnemonic_view_set_words(grid, words);
     lv_obj_update_layout(grid);
 
-    lv_obj_t* ok = ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_align_to(ok, grid, LV_ALIGN_OUT_BOTTOM_MID, 0, 12);
+    if (on_export) {
+        ui_add_btn(s, "Show SeedQR", on_export, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_LEFT, 20, -10);
+        ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
+    } else {
+        lv_obj_t* ok = ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_align_to(ok, grid, LV_ALIGN_OUT_BOTTOM_MID, 0, 12);
+    }
 
     ui_swap_screen(s);
 }

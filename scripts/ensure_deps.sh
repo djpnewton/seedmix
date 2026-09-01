@@ -27,6 +27,8 @@ clone_if_missing() {
 
 clone_if_missing "external/lvgl" "https://github.com/lvgl/lvgl.git" "v9.2.0"
 clone_if_missing "external/libwally-core" "https://github.com/ElementsProject/libwally-core.git" "release_1.5.6"
+clone_if_missing "external/libqrencode" "https://github.com/fukuchi/libqrencode.git" "v4.1.1"
+clone_if_missing "external/quirc" "https://github.com/dlbeer/quirc.git" "v1.2"
 
 # libwally-core has its own submodules (secp256k1) - init them
 if [ -d "${PROJECT_ROOT}/external/libwally-core" ]; then

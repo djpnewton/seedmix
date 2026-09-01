@@ -34,6 +34,9 @@ void ui_show_other_source(ui_cb_t on_camera, ui_cb_t on_scan_qr, ui_cb_t on_dice
                           ui_cb_t on_touch, ui_cb_t on_back);
 void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel);
 void ui_camera_feed_update(const uint8_t* rgb565, uint32_t w, uint32_t h);
+void ui_show_seedqr(const uint8_t* cells, uint32_t size, ui_cb_t on_done);
+void ui_seedqr_cleanup(void);
+void ui_show_qr_scan(ui_cb_t on_scan, ui_cb_t on_cancel);
 void ui_show_touch_screen(ui_tap_cb_t on_tap, ui_cb_t on_cancel);
 void ui_touch_screen_set_status(const char* text);
 void ui_show_dice_sides(ui_uint_cb_t on_sides, ui_cb_t on_back);
@@ -46,7 +49,7 @@ void ui_coin_set_status(const char* text);
 void        ui_show_enter_words(ui_cb_t on_ok);
 const char* ui_get_entered_words(void);
 
-void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok);
+void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok, ui_cb_t on_export);
 void ui_show_merge_process(const char* current_words, const char* current_entropy_hex,
                            const char* new_entropy_hex, const char* merged_entropy_hex,
                            const char* merged_words, ui_cb_t on_ok);
