@@ -19,6 +19,24 @@
 #include "lvgl.h"
 #include "sdkconfig.h"
 
+/* -- Hardening: no radio ---------------------------------------------- */
+/* APP_NO_BLOBS removes the WiFi/Bluetooth/RF-PHY binary blobs, so the device
+ * has no radio capability. */
+#if !CONFIG_APP_NO_BLOBS
+#error                                                                                             \
+    "seedmix hardening (no radio): CONFIG_APP_NO_BLOBS must be enabled (no WiFi/Bluetooth/RF-PHY binary blobs)"
+#endif
+
+/* -- Hardening: no flash storage -------------------------------------- */
+#if CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE
+#error                                                                                             \
+    "seedmix hardening (no flash storage): CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE must be disabled"
+#endif
+#if !CONFIG_PARTITION_TABLE_CUSTOM
+#error                                                                                             \
+    "seedmix hardening (no flash storage): CONFIG_PARTITION_TABLE_CUSTOM must be enabled (partitions_hardened.csv has no data partitions)"
+#endif
+
 static const char* TAG = "seedmix";
 
 /* -- LVGL tick source (milliseconds) ---------------------------------- */

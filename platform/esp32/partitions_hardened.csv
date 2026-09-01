@@ -1,0 +1,8 @@
+# seedmix hardened partition table.
+#
+# No radio + no persistent storage: this table contains ONLY the factory app
+# partition.  There is no NVS, no OTA, no PHY-init and no data partition, so
+# the firmware has nowhere to persist secrets in flash.
+#
+# Name,    Type, SubType, Offset,  Size,     Flags
+factory,   app,  factory, 0x10000, 0x3F0000,
