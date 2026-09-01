@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # -- Ensure external dependencies are present ------------------------------
-# Clones lvgl + libwally-core (and libwally's secp256k1 submodule) if missing.
+# Clones lvgl, libwally-core (+ its secp256k1 submodule), libqrencode and
+# quirc.
 
 set -euo pipefail
 
@@ -11,26 +12,65 @@ if ! command -v git &>/dev/null; then
     exit 1
 fi
 
-clone_if_missing() {
+clone_pinned() {
     local dir="$1"
     local repo="$2"
-    local branch="${3:-}"
-    if [ ! -d "${PROJECT_ROOT}/${dir}" ]; then
-        echo "Cloning ${repo} -> ${dir} …"
-        if [ -n "$branch" ]; then
-            git -C "$PROJECT_ROOT" clone --depth 1 --branch "$branch" "$repo" "$dir"
-        else
-            git -C "$PROJECT_ROOT" clone --depth 1 "$repo" "$dir"
+    local sha="$3"
+    local tag="${4:-}"
+
+    [ -n "$dir" ] || { echo "ERROR: empty dependency dir" >&2; exit 1; }
+
+    # Fast path: already at the pinned commit (offline, no network).
+    local current=""
+    if [ -d "${PROJECT_ROOT}/${dir}/.git" ]; then
+        current="$(git -C "${PROJECT_ROOT}/${dir}" rev-parse HEAD 2>/dev/null || true)"
+    fi
+    if [ "$current" = "$sha" ]; then
+        return 0
+    fi
+
+    # Missing, empty, or at a different commit: (re)clone to the pinned SHA.
+    if [ -n "$current" ]; then
+        echo "Repairing ${dir}: at ${current}, expected ${sha} …"
+    else
+        echo "Cloning ${repo} @ ${sha}${tag:+ (${tag})} -> ${dir} …"
+    fi
+    rm -rf "${PROJECT_ROOT}/${dir}"
+    git init "${PROJECT_ROOT}/${dir}"
+    git -C "${PROJECT_ROOT}/${dir}" remote add origin "$repo"
+    if [ -n "$tag" ]; then
+        # Map the tag to a local ref (a bare `refs/tags/$tag` refspec only
+        # records it in FETCH_HEAD), then verify the pinned SHA matches it.
+        # Annotated tags peel to their commit via ^{}.
+        git -C "${PROJECT_ROOT}/${dir}" fetch --depth 1 origin \
+            "$sha" "refs/tags/$tag:refs/tags/$tag"
+        local tagged
+        tagged="$(git -C "${PROJECT_ROOT}/${dir}" rev-parse "refs/tags/$tag^{}" 2>/dev/null || true)"
+        if [ "$tagged" != "$sha" ]; then
+            echo "ERROR: ${dir}: tag ${tag} is ${tagged:-unresolved}, expected ${sha}" >&2
+            exit 1
         fi
+    else
+        git -C "${PROJECT_ROOT}/${dir}" fetch --depth 1 origin "$sha"
+    fi
+    git -C "${PROJECT_ROOT}/${dir}" checkout --detach FETCH_HEAD
+
+    local got
+    got="$(git -C "${PROJECT_ROOT}/${dir}" rev-parse HEAD)"
+    if [ "$got" != "$sha" ]; then
+        echo "ERROR: ${dir} is at ${got}, expected ${sha}" >&2
+        exit 1
     fi
 }
 
-clone_if_missing "external/lvgl" "https://github.com/lvgl/lvgl.git" "v9.2.0"
-clone_if_missing "external/libwally-core" "https://github.com/ElementsProject/libwally-core.git" "release_1.5.6"
-clone_if_missing "external/libqrencode" "https://github.com/fukuchi/libqrencode.git" "v4.1.1"
-clone_if_missing "external/quirc" "https://github.com/dlbeer/quirc.git" "v1.2"
+clone_pinned "external/lvgl"          "https://github.com/lvgl/lvgl.git"                     "aa7446344c6ec7631112ef031983ef24077e24d5" "v9.2.0"
+clone_pinned "external/libwally-core" "https://github.com/ElementsProject/libwally-core.git" "0c41f38fb1c201786e9c3ac9eae4f5f80c051399" "release_1.5.6"
+clone_pinned "external/libqrencode"   "https://github.com/fukuchi/libqrencode.git"           "715e29fd4cd71b6e452ae0f4e36d917b43122ce8" "v4.1.1"
+clone_pinned "external/quirc"         "https://github.com/dlbeer/quirc.git"                  "542848dd6b9b0eaa9587bbf25b9bc67bd8a71fca" "v1.2"
+clone_pinned "external/unity"         "https://github.com/ThrowTheSwitch/Unity.git"          "860062d51b2e8a75d150337b63ca2a472840d13c" "v2.6.0"
 
-# libwally-core has its own submodules (secp256k1) - init them
+# libwally-core has its own submodule (secp256k1).  Its commit is pinned by
+# libwally-core's gitlink, so `submodule update` checks out an exact SHA.
 if [ -d "${PROJECT_ROOT}/external/libwally-core" ]; then
     git -C "${PROJECT_ROOT}/external/libwally-core" submodule update --init --recursive
 fi
