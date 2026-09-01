@@ -1,23 +1,20 @@
 # -- Unit tests (Linux only) -------------------------------------------------
-# Uses Unity (ThrowTheSwitch), fetched at configure time.
+# Uses Unity (ThrowTheSwitch), vendored by scripts/ensure_deps.sh (pinned to
+# a commit SHA), so no network access is needed at configure time.
 
-include(FetchContent)
+set(UNITY_DIR ${CMAKE_SOURCE_DIR}/external/unity)
+if(NOT EXISTS ${UNITY_DIR}/CMakeLists.txt)
+    message(FATAL_ERROR
+        "Unity not found at ${UNITY_DIR}\n"
+        "Run:  bash scripts/ensure_deps.sh")
+endif()
 
-# We only want the Unity library, not its own test suite.
-set(BUILD_TESTING OFF)
-set(UNITY_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-
-FetchContent_Declare(
-    unity
-    GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
-    GIT_TAG        v2.6.0
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(unity)
+# Build just the unity library (Unity ships no test subdirectory of its own).
+add_subdirectory(${UNITY_DIR} ${CMAKE_BINARY_DIR}/unity)
 
 # -- Coverage instrumentation -----------------------------------------------
 # Instrument only the code under test (targets in this directory), not Unity
-# (fetched above) or libwally (built separately with autotools).
+# (vendored above) or libwally (built separately with autotools).
 if(ENABLE_COVERAGE)
     add_compile_options(-g -O0 --coverage)
     add_link_options(--coverage)
