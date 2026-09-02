@@ -119,6 +119,7 @@ static void we_select_word(lv_event_t* e) {
 
         ui_add_btn_evt(s, "No", we_cancel_confirm, c, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, 90, 60);
 
+        ui_nav_build(s);
         lv_scr_load(s);
     }
 }
@@ -139,8 +140,11 @@ static void we_cancel_confirm(lv_event_t* e) {
     ASSERT_OR_DIE(c, "null context");
     lv_obj_t* confirm_screen = lv_obj_get_parent(lv_event_get_target(e));
     c->selected[0]           = '\0';
-    if (c->entry_screen) lv_scr_load(c->entry_screen); // load first
-    lv_obj_delete(confirm_screen);                     // then delete old
+    if (c->entry_screen) {
+        ui_nav_build(c->entry_screen);
+        lv_scr_load(c->entry_screen); // load first
+    }
+    lv_obj_delete(confirm_screen); // then delete old
 }
 
 /* -- Public API ------------------------------------------------------- */
@@ -204,6 +208,7 @@ word_entry_handle_t ui_word_entry_begin(unsigned total_words, ui_cb_t on_done, u
 
     ui_add_btn_evt(s, "Back", we_go_back, c, UI_BTN_SIZE_SMALL, LV_ALIGN_TOP_RIGHT, -10, 5);
 
+    ui_nav_build(s);
     lv_scr_load(s);
     return c;
 }
@@ -234,7 +239,10 @@ bool ui_word_entry_next(word_entry_handle_t handle) {
 
     we_update_status(c);
     we_refresh_matches(c);
-    if (c->entry_screen) lv_scr_load(c->entry_screen);
+    if (c->entry_screen) {
+        ui_nav_build(c->entry_screen);
+        lv_scr_load(c->entry_screen);
+    }
     return false;
 }
 
@@ -261,6 +269,7 @@ static void we_go_back(lv_event_t* e) {
 
     we_update_status(c);
     we_refresh_matches(c);
+    if (c->entry_screen) ui_nav_build(c->entry_screen);
 }
 
 const char* ui_word_entry_result(word_entry_handle_t handle) {

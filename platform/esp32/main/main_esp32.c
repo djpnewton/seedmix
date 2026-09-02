@@ -18,6 +18,7 @@
 #include "keymap.h"
 #include "lvgl.h"
 #include "sdkconfig.h"
+#include "ui.h"
 
 /* -- Hardening: no radio ---------------------------------------------- */
 /* APP_NO_BLOBS removes the WiFi/Bluetooth/RF-PHY binary blobs, so the device
@@ -52,6 +53,7 @@ void app_main(void) {
     display_init();
     buttons_init();
     keymap_init();
+    ui_nav_set_indev(keymap_get_indev());
 
     // Hold any physical button during boot to enter the hardware debug
     // screen otherwise launch the normal application

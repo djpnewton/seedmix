@@ -67,7 +67,8 @@ The firmware is hardened:
 ## What's implemented so far
 
 - Display bring-up via `esp_lcd` ST7789 + LVGL flush callback.
-- Physical buttons as an LVGL keypad input device.
+- Physical buttons as an LVGL keypad input device driving focus navigation
+  (button 0 = previous item, button 1 = next item, both together = confirm).
 - HAL `hal_get_random()` using `esp_fill_random()`
 - Camera HAL stubs (gated by `CONFIG_SEEDMIX_CAMERA_ENABLE`).
 - `libwally`, `qrencode` and `quirc` built as ESP-IDF components from the
@@ -78,6 +79,7 @@ The firmware is hardened:
 
 ## Still to do
 
-- Add LVGL focus groups so the two buttons can navigate the UI.
 - Make the UI scale to the screen resolution.
 - Implement the touchscreen and camera drivers behind their Kconfig options.
+- Make the manual word-entry flow fully usable with two buttons (the on-screen
+  keyboard needs a button-only input method).

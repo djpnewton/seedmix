@@ -3,11 +3,11 @@
  * @brief Translation layer: physical buttons -> logical LVGL keys.
  *
  * The hardware layer (buttons.c) only reports raw button state.  This layer
- * debounces it and maps combinations to logical keys:
+ * debounces it and maps combinations to logical LVGL navigation keys:
  *
- *   button 0 alone       -> SEEDMIX_KEY_1 ('1')
- *   button 1 alone       -> SEEDMIX_KEY_2 ('2')
- *   button 0 + button 1  -> LV_KEY_ENTER       (both held = confirm)
+ *   button 0 alone       -> LV_KEY_PREV  (previous focusable item)
+ *   button 1 alone       -> LV_KEY_NEXT  (next focusable item)
+ *   button 0 + button 1  -> LV_KEY_ENTER (confirm / activate)
  */
 
 #include "keymap.h"
@@ -56,10 +56,10 @@ static lv_key_t translate(void) {
         return LV_KEY_ENTER;
     }
     if (b0) {
-        return SEEDMIX_KEY_1;
+        return LV_KEY_PREV;
     }
     if (b1) {
-        return SEEDMIX_KEY_2;
+        return LV_KEY_NEXT;
     }
     return 0;
 }

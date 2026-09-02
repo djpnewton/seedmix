@@ -2,9 +2,9 @@
  * @file keymap.h
  * @brief Translation layer: physical buttons -> logical LVGL keys.
  *
- *   button 0 alone       -> SEEDMIX_KEY_1
- *   button 1 alone       -> SEEDMIX_KEY_2
- *   button 0 + button 1  -> LV_KEY_ENTER (confirm)
+ *   button 0 alone       -> LV_KEY_PREV  (previous focusable item)
+ *   button 1 alone       -> LV_KEY_NEXT  (next focusable item)
+ *   button 0 + button 1  -> LV_KEY_ENTER (confirm / activate)
  */
 
 #ifndef SEEDMIX_ESP32_KEYMAP_H
@@ -15,10 +15,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* Logical keys produced by the translation layer. */
-#define SEEDMIX_KEY_1 '1' /* button 0 pressed */
-#define SEEDMIX_KEY_2 '2' /* button 1 pressed */
 
 /**
  * @brief Create the keypad input device with the button translation.
@@ -35,8 +31,9 @@ lv_indev_t* keymap_get_indev(void);
 /**
  * @brief The currently-active logical key (debounced), or 0 if none.
  *
- * Returns '1', '2', LV_KEY_ENTER, or 0, mirroring the translation done for
- * the keypad.  Useful for polling the live state of the buttons.
+ * Returns LV_KEY_PREV, LV_KEY_NEXT, LV_KEY_ENTER, or 0, mirroring the
+ * translation done for the keypad.  Useful for polling the live state of the
+ * buttons.
  */
 lv_key_t keymap_current_key(void);
 

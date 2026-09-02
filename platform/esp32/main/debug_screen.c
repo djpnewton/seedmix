@@ -17,14 +17,14 @@
 
 #include <stdio.h>
 
-static lv_obj_t*   s_debug_scr      = NULL;
-static lv_obj_t*   s_pressed_scr    = NULL;
-static lv_obj_t*   s_pressed_label  = NULL;
-static lv_obj_t*   s_gfx_scr        = NULL;
-static lv_group_t* s_group          = NULL;
-static bool        s_pressed_active = false;
-static bool        s_gfx_active     = false;
-static uint32_t    s_last_enter_ms  = 0;
+static lv_obj_t* s_debug_scr      = NULL;
+static lv_obj_t* s_pressed_scr    = NULL;
+static lv_obj_t* s_pressed_label  = NULL;
+static lv_obj_t* s_gfx_scr        = NULL;
+static bool      s_pressed_active = false;
+static bool      s_gfx_active     = false;
+static uint32_t  s_last_enter_ms  = 0;
+static lv_key_t  s_prev_key       = 0;
 
 static const char* lv_key_name(uint32_t key) {
     switch (key) {
@@ -48,10 +48,6 @@ static const char* lv_key_name(uint32_t key) {
         return "HOME";
     case LV_KEY_END:
         return "END";
-    case SEEDMIX_KEY_1:
-        return "1";
-    case SEEDMIX_KEY_2:
-        return "2";
     default:
         return "?";
     }
@@ -59,43 +55,39 @@ static const char* lv_key_name(uint32_t key) {
 
 static void show_graphics_test(void) {
     s_gfx_active = true;
-    lv_group_focus_obj(s_gfx_scr);
     lv_screen_load(s_gfx_scr);
-}
-
-static void gfx_key_cb(lv_event_t* e) {
-    if (lv_event_get_key(e) != LV_KEY_ENTER) {
-        return;
-    }
-    s_gfx_active    = false;
-    s_last_enter_ms = 0;
-    lv_group_focus_obj(s_debug_scr);
-    lv_screen_load(s_debug_scr);
-}
-
-/* ENTER twice in quick succession activates the graphics test. */
-static void debug_key_cb(lv_event_t* e) {
-    if (lv_event_get_key(e) != LV_KEY_ENTER) {
-        return;
-    }
-    uint32_t now = lv_tick_get();
-    if (now - s_last_enter_ms <= 800) {
-        s_last_enter_ms = 0;
-        show_graphics_test();
-    } else {
-        s_last_enter_ms = now;
-    }
 }
 
 /* Switch screens based on the current logical key (debounced). */
 static void debug_poll_cb(lv_timer_t* t) {
     (void)t;
 
+    lv_key_t key = keymap_current_key();
+
     if (s_gfx_active) {
-        return; /* graphics test screen manages its own input */
+        /* Graphics test screen: ENTER returns to the summary screen. */
+        if (key == LV_KEY_ENTER && s_prev_key != LV_KEY_ENTER) {
+            s_gfx_active    = false;
+            s_last_enter_ms = 0;
+            lv_screen_load(s_debug_scr);
+        }
+        s_prev_key = key;
+        return;
     }
 
-    lv_key_t key = keymap_current_key();
+    /* ENTER twice in quick succession activates the graphics test. */
+    if (key == LV_KEY_ENTER && s_prev_key != LV_KEY_ENTER) {
+        uint32_t now = lv_tick_get();
+        if (now - s_last_enter_ms <= 800) {
+            s_last_enter_ms = 0;
+            s_prev_key      = key;
+            show_graphics_test();
+            return;
+        }
+        s_last_enter_ms = now;
+    }
+    s_prev_key = key;
+
     if (key != 0) {
         if (!s_pressed_active) {
             s_pressed_active = true;
@@ -159,20 +151,6 @@ void debug_screen_init(void) {
     s_gfx_scr = graphics_test_create();
 
     lv_screen_load(s_debug_scr);
-
-#if CONFIG_SEEDMIX_BUTTONS_ENABLE
-    /* Route the keypad to a group so presses are delivered as LV_EVENT_KEY. */
-    lv_indev_t* kbd = keymap_get_indev();
-    if (kbd) {
-        s_group = lv_group_create();
-        lv_group_add_obj(s_group, s_debug_scr);
-        lv_group_add_obj(s_group, s_gfx_scr);
-        lv_indev_set_group(kbd, s_group);
-        lv_group_focus_obj(s_debug_scr);
-        lv_obj_add_event_cb(s_debug_scr, debug_key_cb, LV_EVENT_KEY, NULL);
-        lv_obj_add_event_cb(s_gfx_scr, gfx_key_cb, LV_EVENT_KEY, NULL);
-    }
-#endif
 
     /* Poll the raw button state to switch screens on press/release. */
     lv_timer_create(debug_poll_cb, 20, NULL);

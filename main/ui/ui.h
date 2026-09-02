@@ -58,6 +58,17 @@ void ui_delay_ms(uint32_t ms);
 void ui_go_main(void);
 
 /**
+ * @brief Attach a keypad/encoder input device for button navigation.
+ *
+ * Creates the shared navigation group and routes the input device to it.
+ * Call once after lv_init() and before the first screen is shown.  The group
+ * is rebuilt automatically every time a screen is swapped in, collecting the
+ * screen's focusable widgets (buttons, textareas, keyboards and clickable
+ * labels).
+ */
+void ui_nav_set_indev(lv_indev_t* indev);
+
+/**
  * @brief Show a brief startup splash screen, then call @p on_done.
  *
  * The splash is shown for a fixed delay and then automatically transitions
