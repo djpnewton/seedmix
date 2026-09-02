@@ -125,6 +125,8 @@ const lv_font_t* ui_font(uint8_t px) {
     return best;
 }
 
+bool ui_small_screen(void) { return LV_HOR_RES <= 320; }
+
 // Deferred screen deletion - safe to call from event handlers
 static void delete_screen_cb(void* ptr) {
     lv_obj_t* scr = (lv_obj_t*)ptr;
@@ -250,6 +252,66 @@ lv_obj_t* ui_add_btn_evt(lv_obj_t* parent, const char* text, lv_event_cb_t evt_c
     return b;
 }
 
+/* -- Scroll arrows ---------------------------------------------------- */
+typedef struct {
+    lv_obj_t*  target;
+    lv_coord_t step;
+} scroll_arrows_ctx_t;
+
+static void scroll_arrows_up_cb(lv_event_t* e) {
+    scroll_arrows_ctx_t* ctx = lv_event_get_user_data(e);
+    if (ctx && ctx->target) lv_obj_scroll_by(ctx->target, 0, -ctx->step, LV_ANIM_OFF);
+}
+
+static void scroll_arrows_down_cb(lv_event_t* e) {
+    scroll_arrows_ctx_t* ctx = lv_event_get_user_data(e);
+    if (ctx && ctx->target) lv_obj_scroll_by(ctx->target, 0, ctx->step, LV_ANIM_OFF);
+}
+
+static void scroll_arrows_delete_cb(lv_event_t* e) {
+    lv_obj_t*            cont = lv_event_get_target(e);
+    scroll_arrows_ctx_t* ctx  = (scroll_arrows_ctx_t*)lv_obj_get_user_data(cont);
+    if (ctx) lv_free(ctx);
+}
+
+lv_obj_t* ui_add_scroll_arrows(lv_obj_t* parent, lv_obj_t* target, lv_coord_t step) {
+    ASSERT_OR_DIE(parent, "null parent");
+    ASSERT_OR_DIE(target, "null target");
+    if (step <= 0) step = lv_obj_get_height(target);
+
+    scroll_arrows_ctx_t* ctx = lv_malloc(sizeof(*ctx));
+    ASSERT_OR_DIE(ctx, "scroll arrows ctx alloc");
+    ctx->target = target;
+    ctx->step   = step;
+
+    lv_obj_t* cont = lv_obj_create(parent);
+    lv_obj_set_size(cont, ui_scale(44), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(cont, lv_color_black(), 0);
+    lv_obj_set_style_border_width(cont, 0, 0);
+    lv_obj_set_style_pad_all(cont, 0, 0);
+    lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(cont, ui_scale(6), 0);
+    lv_obj_set_user_data(cont, ctx);
+    lv_obj_add_event_cb(cont, scroll_arrows_delete_cb, LV_EVENT_DELETE, NULL);
+
+    lv_obj_t* up = lv_button_create(cont);
+    lv_obj_set_size(up, ui_scale(40), ui_scale(40));
+    lv_obj_add_event_cb(up, scroll_arrows_up_cb, LV_EVENT_CLICKED, ctx);
+    lv_obj_t* up_lbl = lv_label_create(up);
+    lv_label_set_text(up_lbl, LV_SYMBOL_UP);
+    lv_obj_center(up_lbl);
+
+    lv_obj_t* down = lv_button_create(cont);
+    lv_obj_set_size(down, ui_scale(40), ui_scale(40));
+    lv_obj_add_event_cb(down, scroll_arrows_down_cb, LV_EVENT_CLICKED, ctx);
+    lv_obj_t* down_lbl = lv_label_create(down);
+    lv_label_set_text(down_lbl, LV_SYMBOL_DOWN);
+    lv_obj_center(down_lbl);
+
+    return cont;
+}
+
 void ui_go_main(void) {
     if (main_scr) {
         ui_nav_build(main_scr);
@@ -350,6 +412,8 @@ void ui_show_main(lv_event_cb_t on_new_wallet, lv_event_cb_t on_test_error) {
         // Test error button
         lv_obj_t* test_btn = ui_add_btn_evt(scr, "test error!", on_test_error, NULL,
                                             UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -40, -10);
+        lv_obj_set_width(test_btn, ui_scale(140));
+        lv_obj_align(test_btn, LV_ALIGN_BOTTOM_RIGHT, ui_scale(-40), ui_scale(-10));
         lv_obj_set_style_bg_color(test_btn, lv_color_hex(0x440000), 0);
     }
     ui_nav_build(main_scr);
@@ -866,6 +930,19 @@ void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok, ui
     ui_mnemonic_view_set_words(grid, words);
     lv_obj_update_layout(grid);
 
+    if (ui_small_screen()) {
+        lv_coord_t top   = ui_scale(show_warning ? 85 : 55);
+        lv_coord_t max_h = LV_VER_RES - top - ui_scale(76);
+        if (max_h < ui_scale(40)) max_h = ui_scale(40);
+        if (lv_obj_get_height(grid) > max_h) {
+            lv_obj_set_height(grid, max_h);
+            lv_obj_add_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_scroll_dir(grid, LV_DIR_VER);
+        }
+        lv_obj_t* arrows = ui_add_scroll_arrows(s, grid, ui_scale(30));
+        lv_obj_align_to(arrows, grid, LV_ALIGN_OUT_RIGHT_MID, ui_scale(4), 0);
+    }
+
     if (on_export) {
         ui_add_btn(s, "Show SeedQR", on_export, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_LEFT, 20, -10);
         ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
@@ -922,6 +999,11 @@ void ui_show_merge_process(const char* current_words, const char* current_entrop
             lv_obj_set_width(val, ui_scale(420));
             lv_label_set_long_mode(val, LV_LABEL_LONG_WRAP);
         }
+    }
+
+    if (!hal_touch_available()) {
+        lv_obj_t* arrows = ui_add_scroll_arrows(s, cont, ui_scale(24));
+        lv_obj_align_to(arrows, cont, LV_ALIGN_OUT_RIGHT_MID, ui_scale(4), 0);
     }
 
     ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_MID, 0, -10);

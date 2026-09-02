@@ -40,6 +40,21 @@ lv_coord_t ui_scale(lv_coord_t n);
 const lv_font_t* ui_font(uint8_t px);
 
 /**
+ * True when the active display is a small (embedded) panel, e.g. the TTGO
+ * T-Display's 240x135.  Used to switch layouts (fewer columns, arrow
+ * controls) that only make sense when space is tight.
+ */
+bool ui_small_screen(void);
+
+/**
+ * Create an up/down arrow button pair that scrolls @p target vertically by
+ * @p step pixels per press.  Returns the container holding both buttons; the
+ * caller positions it (typically lv_obj_align_to(... LV_ALIGN_OUT_RIGHT_MID
+ * ...)).  @p target must have vertical scrolling enabled.
+ */
+lv_obj_t* ui_add_scroll_arrows(lv_obj_t* parent, lv_obj_t* target, lv_coord_t step);
+
+/**
  * Rebuild the shared navigation group from the focusable widgets on @p scr
  * and focus the first one.  No-op when no navigation input device has been
  * attached (e.g. on desktop builds).

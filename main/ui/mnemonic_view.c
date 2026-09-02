@@ -11,7 +11,8 @@
 #include <string.h>
 
 #define MNEMONIC_VIEW_MAX_WORDS 24
-#define MNEMONIC_VIEW_COLS 4
+#define MNEMONIC_VIEW_COLS_LARGE 4
+#define MNEMONIC_VIEW_COLS_SMALL 2
 #define MNEMONIC_VIEW_ROW_H 30
 
 typedef struct {
@@ -70,7 +71,7 @@ void ui_mnemonic_view_set_words(lv_obj_t* view, const char* words) {
 
     if (count == 0) return;
 
-    unsigned cols = MNEMONIC_VIEW_COLS;
+    unsigned cols = ui_small_screen() ? MNEMONIC_VIEW_COLS_SMALL : MNEMONIC_VIEW_COLS_LARGE;
     unsigned rows = (unsigned)((count + cols - 1) / cols);
 
     /* Grid template: equal-width columns, fixed-height rows. */
