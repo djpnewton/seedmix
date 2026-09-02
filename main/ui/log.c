@@ -4,6 +4,7 @@
  */
 
 #include "log.h"
+#include "hal.h"
 #include "mnemonic_view.h"
 #include "ui_internal.h"
 #include "util/error.h"
@@ -57,11 +58,17 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
     lv_obj_update_layout(mn_area);
 
     // Cap tall grids (24 words) so the log below always has room; allow scroll.
-    lv_coord_t mn_h = lv_obj_get_height(mn_area);
+    bool       mn_scrollable = false;
+    lv_coord_t mn_h          = lv_obj_get_height(mn_area);
     if (mnemonic_words && mnemonic_words[0] && mn_h > ui_scale(150)) {
         lv_obj_set_height(mn_area, ui_scale(150));
         lv_obj_add_flag(mn_area, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_scroll_dir(mn_area, LV_DIR_VER);
+        mn_scrollable = true;
+    }
+    if (mn_scrollable && ui_small_screen()) {
+        lv_obj_t* arrows = ui_add_scroll_arrows(s, mn_area, ui_scale(30));
+        lv_obj_align_to(arrows, mn_area, LV_ALIGN_OUT_RIGHT_MID, ui_scale(4), 0);
     }
 
     // log entries (oldest first, top to bottom)
@@ -91,6 +98,11 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
     if (log_h < 40) log_h = 40;
     lv_obj_set_size(log_cont, ui_scale(440), log_h);
     lv_obj_align(log_cont, LV_ALIGN_TOP_MID, 0, log_top);
+
+    if (!hal_touch_available()) {
+        lv_obj_t* arrows = ui_add_scroll_arrows(s, log_cont, ui_scale(24));
+        lv_obj_align_to(arrows, log_cont, LV_ALIGN_OUT_RIGHT_MID, ui_scale(4), 0);
+    }
 
     // back button
     ui_add_btn(s, "Back", on_back, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_MID, 0, -10);
