@@ -70,12 +70,14 @@ The firmware is hardened:
 - Physical buttons as an LVGL keypad input device.
 - HAL `hal_get_random()` using `esp_fill_random()`
 - Camera HAL stubs (gated by `CONFIG_SEEDMIX_CAMERA_ENABLE`).
+- `libwally`, `qrencode` and `quirc` built as ESP-IDF components from the
+  vendored sources in `external/`, and the shared app sources compiled into
+  the `main` component.
+- Boot selection: hold any button during boot to show the hardware debug
+  screen, otherwise the normal application (`app_init`) runs.
 
 ## Still to do
 
-- Build `libwally` (and its secp256k1) as an ESP-IDF component, plus
-  `qrencode`/`quirc`, then compile the shared app sources from `main/`
-  (`main.c`, `ui/`, `crypto/`, `qr/`) into this component and call
-  `app_init()`.
 - Add LVGL focus groups so the two buttons can navigate the UI.
+- Make the UI scale to the screen resolution.
 - Implement the touchscreen and camera drivers behind their Kconfig options.

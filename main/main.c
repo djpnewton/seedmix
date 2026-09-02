@@ -267,9 +267,10 @@ static void camera_feed_tick(lv_timer_t* t) {
     hal_camera_frame_free(&camera_frame);
     camera_frame = next;
 
-    LOG_INFO("camera frame: %ux%u pixfmt=%s size=%zu bytes_per_line=%u", camera_frame.width,
-             camera_frame.height, camera_pixfmt_name(camera_frame.pixfmt), camera_frame.size,
-             camera_frame.bytes_per_line);
+    LOG_INFO("camera frame: %ux%u pixfmt=%s size=%zu bytes_per_line=%u",
+             (unsigned)camera_frame.width, (unsigned)camera_frame.height,
+             camera_pixfmt_name(camera_frame.pixfmt), camera_frame.size,
+             (unsigned)camera_frame.bytes_per_line);
 
     if (camera_frame.width != camera_w || camera_frame.height != camera_h) {
         /* dimensions changed - drop the stale preview buffer */
@@ -464,9 +465,9 @@ static void on_dice_roll(uint8_t value) {
 
     if (!dice_entropy_ready(dice)) {
         char status[64];
-        int  res =
-            snprintf(status, sizeof(status), "Entropy: %u / %u bits (%u rolls)",
-                     dice_entropy_bits(dice), dice_entropy_needed(dice), dice_entropy_rolls(dice));
+        int  res = snprintf(status, sizeof(status), "Entropy: %u / %u bits (%u rolls)",
+                           (unsigned)dice_entropy_bits(dice), (unsigned)dice_entropy_needed(dice),
+                           dice_entropy_rolls(dice));
         ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(status), "status string too long");
         ui_dice_set_status(status);
         return;
@@ -519,9 +520,9 @@ static void on_coin_flip(uint8_t value) {
 
     if (!coin_entropy_ready(coin)) {
         char status[64];
-        int  res =
-            snprintf(status, sizeof(status), "Entropy: %u / %u bits (%u flips)",
-                     coin_entropy_bits(coin), coin_entropy_needed(coin), coin_entropy_flips(coin));
+        int  res = snprintf(status, sizeof(status), "Entropy: %u / %u bits (%u flips)",
+                           (unsigned)coin_entropy_bits(coin), (unsigned)coin_entropy_needed(coin),
+                           coin_entropy_flips(coin));
         ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(status), "status string too long");
         ui_coin_set_status(status);
         return;
@@ -566,8 +567,9 @@ static void on_touch_tap(lv_coord_t x, lv_coord_t y) {
 
     if (!touch_entropy_ready(touch)) {
         char status[64];
-        int  res = snprintf(status, sizeof(status), "Entropy: %u / %u bits",
-                           touch_entropy_bits(touch), touch_entropy_needed(touch));
+        int  res =
+            snprintf(status, sizeof(status), "Entropy: %u / %u bits",
+                     (unsigned)touch_entropy_bits(touch), (unsigned)touch_entropy_needed(touch));
         ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(status), "status string too long");
         ui_touch_screen_set_status(status);
         return;
