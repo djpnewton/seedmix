@@ -74,3 +74,8 @@ void hal_camera_frame_free(hal_camera_frame_t* frame) {
     }
     memset(frame, 0, sizeof(*frame));
 }
+
+/* -- Touch / pointer input ------------------------------------------- */
+bool hal_touch_available(void) {
+    return false;
+}

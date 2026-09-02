@@ -9,6 +9,7 @@
 #include "assets/splash_240x135_img.h"
 #include "mnemonic_view.h"
 #include "src/widgets/label/lv_label_private.h"
+#include "hal.h"
 #include "ui_internal.h"
 #include "util/error.h"
 #include "util/utils.h"
@@ -396,20 +397,47 @@ void ui_show_source(ui_cb_t on_generate, ui_cb_t on_enter, ui_cb_t on_other_sour
 
 void ui_show_other_source(ui_cb_t on_camera, ui_cb_t on_scan_qr, ui_cb_t on_dice, ui_cb_t on_coins,
                           ui_cb_t on_touch, ui_cb_t on_back) {
-    ASSERT_OR_DIE(on_camera, "null on_camera");
-    ASSERT_OR_DIE(on_scan_qr, "null on_scan_qr");
     ASSERT_OR_DIE(on_dice, "null on_dice");
     ASSERT_OR_DIE(on_coins, "null on_coins");
-    ASSERT_OR_DIE(on_touch, "null on_touch");
     ASSERT_OR_DIE(on_back, "null on_back");
+
+    // Hide hardware-backed sources when the hardware is unavailable.
+    bool have_camera = hal_camera_available();
+    bool have_touch  = hal_touch_available();
+
+    const char* texts[5];
+    ui_cb_t     cbs[5];
+    unsigned    n = 0;
+
+    if (have_camera) {
+        ASSERT_OR_DIE(on_camera, "null on_camera");
+        ASSERT_OR_DIE(on_scan_qr, "null on_scan_qr");
+        texts[n] = "Camera Image";
+        cbs[n++] = on_camera;
+        texts[n] = "Scan QR";
+        cbs[n++] = on_scan_qr;
+    }
+    texts[n] = "Dice Rolls";
+    cbs[n++] = on_dice;
+    texts[n] = "Coin Flips";
+    cbs[n++] = on_coins;
+    if (have_touch) {
+        ASSERT_OR_DIE(on_touch, "null on_touch");
+        texts[n] = "Touch Screen";
+        cbs[n++] = on_touch;
+    }
 
     lv_obj_t* s = ui_make_screen();
     ui_add_title(s, "Other Sources");
-    ui_add_btn(s, "Camera Image", on_camera, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -86);
-    ui_add_btn(s, "Scan QR", on_scan_qr, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, -34);
-    ui_add_btn(s, "Dice Rolls", on_dice, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 18);
-    ui_add_btn(s, "Coin Flips", on_coins, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 70);
-    ui_add_btn(s, "Touch Screen", on_touch, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 122);
+
+    // Offsets are reference (480x320) values: ui_add_btn() scales them, so
+    // they must not be pre-scaled here or they get scaled twice
+    lv_coord_t step = 52;
+    lv_coord_t y0   = 18 - (lv_coord_t)((n - 1) * step) / 2;
+    for (unsigned i = 0; i < n; i++) {
+        ui_add_btn(s, texts[i], cbs[i], UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0,
+                   y0 + (lv_coord_t)i * step);
+    }
 
     /* back button (bottom-right) */
     ui_add_btn(s, "Back", on_back, UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
