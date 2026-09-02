@@ -7,6 +7,9 @@
 CONFIG_IDF_TARGET="esp32"
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 
+# -- FreeRTOS ----------------------------------------------------------
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+
 # -- LVGL (vendored component, configured via its own Kconfig) ---------
 CONFIG_LV_CONF_SKIP=y
 CONFIG_LV_COLOR_DEPTH_16=y
