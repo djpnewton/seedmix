@@ -23,19 +23,44 @@ if(NOT EXISTS ${LIBWALLY_SOURCE_DIR}/tools/autogen.sh)
         "Run:  git submodule update --init")
 endif()
 
+# Emscripten: build libwally with emcc in a pristine COPY of the source tree
+# (under the CMake binary dir).  Both platforms build in-source, so the WASM
+# objects never collide with the native Linux in-source build.  A VPATH build
+# is not viable because the Linux build leaves in-source artifacts
+# (config.status, *.la) in the shared source tree, which confuse make's VPATH
+# search.  `git archive` produces a clean tree with no build artifacts.
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    set(LIBWALLY_MAKE_WRAPPER emmake)
+    set(LIBWALLY_BUILD_DIR ${CMAKE_BINARY_DIR}/libwally-src)
+    set(LIBWALLY_EXTRA_ARGS BINARY_DIR ${LIBWALLY_BUILD_DIR})
+    set(LIBWALLY_BUILD_IN_SOURCE 0)
+    # Populate the (empty) binary dir with a pristine libwally tree via git
+    # archive, then configure it in-place there.  This avoids both the shared
+    # in-source artifacts and make's VPATH search seeing stale *.la files.
+    set(LIBWALLY_CONFIGURE_COMMAND
+        bash -c "cd ${LIBWALLY_BUILD_DIR} && find . -mindepth 1 -delete && git -C ${LIBWALLY_SOURCE_DIR} archive HEAD | tar -x -C . && mkdir -p src/secp256k1 && git -C ${LIBWALLY_SOURCE_DIR}/src/secp256k1 archive HEAD | tar -x -C src/secp256k1 && ./tools/autogen.sh && emconfigure ./configure --prefix=${LIBWALLY_INSTALL_DIR} --enable-static --disable-shared --disable-elements --enable-standard-secp")
+else()
+    set(LIBWALLY_MAKE_WRAPPER "")
+    set(LIBWALLY_EXTRA_ARGS)
+    set(LIBWALLY_BUILD_IN_SOURCE 1)
+    set(LIBWALLY_CONFIGURE_COMMAND
+        cd ${LIBWALLY_SOURCE_DIR}
+        COMMAND ./tools/autogen.sh
+        COMMAND ./configure
+            --prefix=${LIBWALLY_INSTALL_DIR}
+            --enable-static
+            --disable-shared
+            --disable-elements
+            --enable-standard-secp)
+endif()
+
 ExternalProject_Add(libwally_ext
+    ${LIBWALLY_EXTRA_ARGS}
     SOURCE_DIR        ${LIBWALLY_SOURCE_DIR}
-    CONFIGURE_COMMAND cd ${LIBWALLY_SOURCE_DIR}
-                COMMAND ./tools/autogen.sh
-                COMMAND ./configure
-                    --prefix=${LIBWALLY_INSTALL_DIR}
-                    --enable-static
-                    --disable-shared
-                    --disable-elements
-                    --enable-standard-secp
-    BUILD_COMMAND     $(MAKE) -j
-    INSTALL_COMMAND   $(MAKE) install
-    BUILD_IN_SOURCE   1
+    CONFIGURE_COMMAND ${LIBWALLY_CONFIGURE_COMMAND}
+    BUILD_COMMAND     ${LIBWALLY_MAKE_WRAPPER} $(MAKE) -j
+    INSTALL_COMMAND   ${LIBWALLY_MAKE_WRAPPER} $(MAKE) install
+    BUILD_IN_SOURCE   ${LIBWALLY_BUILD_IN_SOURCE}
     BUILD_BYPRODUCTS  ${LIBWALLY_LIBRARY}
     USES_TERMINAL_CONFIGURE OFF
     USES_TERMINAL_BUILD     OFF

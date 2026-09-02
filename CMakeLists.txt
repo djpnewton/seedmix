@@ -15,13 +15,20 @@ option(ENABLE_COVERAGE "Enable code coverage instrumentation (gcov/lcov)" OFF)
 set(ENABLE_SANITIZERS "" CACHE STRING "Comma-separated sanitizers for tests (e.g. address,undefined)")
 
 # -- Platform Detection -----------------------------------------------------
-# This top-level CMakeLists.txt builds the Linux/SDL2 prototype only.
-# The ESP32 firmware is a separate ESP-IDF project built with idf.py
+# This top-level CMakeLists.txt builds the Linux/SDL2 prototype and the
+# Emscripten web build. The ESP32 firmware is a separate ESP-IDF project
+# built with idf.py
 if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
     message(FATAL_ERROR "ESP32 builds use ESP-IDF")
 endif()
-set(PLATFORM "linux")
-message(STATUS "Building for Linux (prototype)")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    set(PLATFORM "web")
+    message(STATUS "Building for Web (Emscripten)")
+else()
+    set(PLATFORM "linux")
+    message(STATUS "Building for Linux (prototype)")
+endif()
 
 # -- Common Source Files ----------------------------------------------------
 set(COMMON_SOURCES
@@ -47,7 +54,11 @@ set(COMMON_SOURCES
 )
 
 # -- Platform-Specific Setup ------------------------------------------------
-include(${CMAKE_SOURCE_DIR}/platform/linux/linux.cmake)
+if(PLATFORM STREQUAL "web")
+    include(${CMAKE_SOURCE_DIR}/platform/web/web.cmake)
+else()
+    include(${CMAKE_SOURCE_DIR}/platform/linux/linux.cmake)
+endif()
 
 # -- Tests -------------------------------------------------------------------
 if(BUILD_TESTS)

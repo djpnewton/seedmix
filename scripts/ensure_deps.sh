@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # -- Ensure external dependencies are present ------------------------------
 # Clones lvgl, libwally-core (+ its secp256k1 submodule), libqrencode and
-# quirc.
+# quirc.  Also provides ensure_emsdk() (invoked by scripts/build_web.sh) to
+# install the pinned Emscripten SDK.
 
 set -euo pipefail
 
@@ -61,6 +62,26 @@ clone_pinned() {
         echo "ERROR: ${dir} is at ${got}, expected ${sha}" >&2
         exit 1
     fi
+}
+
+# -- Emscripten SDK ---------------------------------------------------------
+ensure_emsdk() {
+    local emsdk_sha="5eb0bde7585670252e8ba05e9d361627bffd08b5" # tag 6.0.9
+    local emsdk_ver="6.0.9"
+
+    clone_pinned "external/emsdk" "https://github.com/emscripten-core/emsdk.git" \
+        "$emsdk_sha" "$emsdk_ver"
+
+    local emsdk_dir="${PROJECT_ROOT}/external/emsdk"
+    local emcc_bin="${emsdk_dir}/upstream/emscripten/emcc"
+
+    if [ ! -x "$emcc_bin" ]; then
+        echo "Installing Emscripten ${emsdk_ver} (first run downloads ~500 MB)…"
+        "${emsdk_dir}/emsdk" install "$emsdk_ver"
+    fi
+
+    # (Re)activate so emsdk_env.sh + ~/.emscripten stay in sync with this SDK.
+    "${emsdk_dir}/emsdk" activate "$emsdk_ver"
 }
 
 clone_pinned "external/lvgl"          "https://github.com/lvgl/lvgl.git"                     "aa7446344c6ec7631112ef031983ef24077e24d5" "v9.2.0"

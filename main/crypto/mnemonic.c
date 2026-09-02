@@ -67,7 +67,7 @@ mnemonic_t* mnemonic_generate(unsigned word_count, mnemonic_process_cb_t process
 
     uint8_t entropy[MAX_ENTROPY_BYTES] = {0};
 
-    char process[64];
+    char process[128];
     int  res = snprintf(process, sizeof(process), "Generating %zu bytes of entropy from %s...",
                        entropy_len, hal_get_random_source());
     ASSERT_OR_DIE(res > 0 && (size_t)res < sizeof(process), "process string too long");
