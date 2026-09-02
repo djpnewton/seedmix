@@ -71,11 +71,12 @@ void fatal_handler(const char* file, int line, const char* fmt, ...) {
     error_screen(file, line, fmt, args);
     va_end(args);
 
-#ifdef ESP_PLATFORM
+#if defined(ESP_PLATFORM) || defined(__EMSCRIPTEN__)
     while (1) {
         ui_delay_ms(5);
     }
 #else
+    // exit after 3 seconds on the desktop prototype
     sleep(3);
     exit(1);
 #endif

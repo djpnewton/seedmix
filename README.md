@@ -28,6 +28,26 @@ chmod +x scripts/build.sh
 
 A 480×320 window opens with a "Generate" button that creates a BIP39 mnemonic.
 
+## Web (Emscripten)
+
+Build the app for the browser.  The page uses the SDL2 backend for the LVGL
+display, Web Crypto (`crypto.getRandomValues`) for entropy, and `getUserMedia`
+for camera when a webcam is available.
+
+```bash
+# Build (first run auto-installs the pinned Emscripten SDK into external/emsdk)
+./scripts/build_web.sh
+
+# Serve and open http://localhost:8000/seedmix.html
+./scripts/build_web.sh serve
+```
+
+On first run the script downloads the Emscripten toolchain (~500 MB) into
+`external/emsdk` and installs version 6.0.9.  Set `EMSDK=/path/to/emsdk` to
+reuse an SDK you've already installed.
+
+Camera access requires a secure context (https:// or http://localhost).
+
 ## ESP32 Deployment
 
 See [platform/esp32/README.md](platform/esp32/README.md) for:

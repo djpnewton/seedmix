@@ -5,11 +5,11 @@
 
 #include "ui.h"
 #include "assets/logo_img.h"
-#include "assets/splash_480x320_img.h"
 #include "assets/splash_240x135_img.h"
+#include "assets/splash_480x320_img.h"
+#include "hal.h"
 #include "mnemonic_view.h"
 #include "src/widgets/label/lv_label_private.h"
-#include "hal.h"
 #include "ui_internal.h"
 #include "util/error.h"
 #include "util/utils.h"
@@ -103,14 +103,9 @@ const lv_font_t* ui_font(uint8_t px) {
         uint8_t          px;
         const lv_font_t* font;
     } fonts[] = {
-        {10, &lv_font_montserrat_10},
-        {12, &lv_font_montserrat_12},
-        {14, &lv_font_montserrat_14},
-        {18, &lv_font_montserrat_18},
-        {20, &lv_font_montserrat_20},
-        {24, &lv_font_montserrat_24},
-        {28, &lv_font_montserrat_28},
-        {48, &lv_font_montserrat_48},
+        {10, &lv_font_montserrat_10}, {12, &lv_font_montserrat_12}, {14, &lv_font_montserrat_14},
+        {18, &lv_font_montserrat_18}, {20, &lv_font_montserrat_20}, {24, &lv_font_montserrat_24},
+        {28, &lv_font_montserrat_28}, {48, &lv_font_montserrat_48},
     };
 
     lv_coord_t       want = ui_scale(px);
@@ -213,11 +208,9 @@ static const struct {
     lv_coord_t h;
     uint8_t    font_px; // reference font size, scaled via ui_font()
 } btn_sizes[] = {
-    [UI_BTN_SIZE_SMALL] = {80, 30, 14},
-    [UI_BTN_SIZE_MED]   = {160, 44, 24},
-    [UI_BTN_SIZE_LARGE] = {200, 44, 24},
-    [UI_BTN_SIZE_WIDE]  = {180, 44, 24},
-    [UI_BTN_SIZE_HERO]  = {240, 56, 28},
+    [UI_BTN_SIZE_SMALL] = {80, 30, 14},  [UI_BTN_SIZE_MED] = {160, 44, 24},
+    [UI_BTN_SIZE_LARGE] = {200, 44, 24}, [UI_BTN_SIZE_WIDE] = {180, 44, 24},
+    [UI_BTN_SIZE_HERO] = {240, 56, 28},
 };
 
 static lv_obj_t* add_btn_impl(lv_obj_t* parent, const char* text, ui_btn_size_t size,
@@ -354,9 +347,9 @@ static const lv_image_dsc_t* ui_pick_splash(void) {
     int32_t w = LV_HOR_RES, h = LV_VER_RES;
     if (w <= 0 || h <= 0) return s_splashes[0].dsc;
 
-    int32_t             disp_ar    = (w * 1000) / h;
-    const lv_image_dsc_t* best      = s_splashes[0].dsc;
-    int32_t             best_delta = 0x7fffffff;
+    int32_t               disp_ar    = (w * 1000) / h;
+    const lv_image_dsc_t* best       = s_splashes[0].dsc;
+    int32_t               best_delta = 0x7fffffff;
     for (size_t i = 0; i < sizeof(s_splashes) / sizeof(s_splashes[0]); i++) {
         int32_t ar    = (s_splashes[i].w * 1000) / s_splashes[i].h;
         int32_t delta = LV_ABS(disp_ar - ar);

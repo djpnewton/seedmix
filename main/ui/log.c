@@ -94,7 +94,8 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
     // Fit the log between the mnemonic area and the back button.
     lv_coord_t mn_bottom = lv_obj_get_y(mn_area) + lv_obj_get_height(mn_area);
     lv_coord_t log_top   = mn_bottom + ui_scale(8);
-    lv_coord_t log_h     = (LV_VER_RES - ui_scale(10) - ui_scale(44)) - ui_scale(8) - log_top; /* above back button */
+    lv_coord_t log_h =
+        (LV_VER_RES - ui_scale(10) - ui_scale(44)) - ui_scale(8) - log_top; /* above back button */
     if (log_h < 40) log_h = 40;
     lv_obj_set_size(log_cont, ui_scale(440), log_h);
     lv_obj_align(log_cont, LV_ALIGN_TOP_MID, 0, log_top);
