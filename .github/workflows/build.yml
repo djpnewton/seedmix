@@ -36,3 +36,24 @@ jobs:
 
       - name: Verify binary exists
         run: test -x build/seedmix
+
+  esp32:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Clone dependencies
+        run: bash scripts/ensure_deps.sh
+
+      - name: Build firmware (ESP-IDF v5.5.5)
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.5
+          target: esp32
+          path: platform/esp32
+
+      - name: Verify firmware exists
+        run: test -f platform/esp32/build/seedmix.bin
