@@ -31,6 +31,8 @@ ExternalProject_Add(libwally_ext
                     --prefix=${LIBWALLY_INSTALL_DIR}
                     --enable-static
                     --disable-shared
+                    --disable-elements
+                    --enable-standard-secp
     BUILD_COMMAND     $(MAKE) -j
     INSTALL_COMMAND   $(MAKE) install
     BUILD_IN_SOURCE   1

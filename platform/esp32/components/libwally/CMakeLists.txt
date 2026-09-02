@@ -1,7 +1,7 @@
 # libwally-core as an ESP-IDF component.
 #
-# Builds the bundled libsecp256k1 (the -zkp variant that ships with
-# libwally-core) followed by the wallycore sources from
+# Builds the bundled libsecp256k1 (standard modules only - the zkp extension
+# modules are unused by seedmix) followed by the wallycore sources from
 # external/libwally-core.  The upstream build is driven by its CMake files,
 # but those ship with underscore-prefixed names (_CMakeLists.txt/_cmake) to
 # keep the autotools build primary, so we replicate the equivalent
@@ -11,21 +11,23 @@ set(WALLY_DIR "${COMPONENT_DIR}/../../../..//external/libwally-core")
 
 idf_component_register(SRCS "")
 
-# -- Bundled secp256k1 (libsecp256k1-zkp) --------------------------------
-# Mirror the module set from external/libwally-core/_CMakeLists.txt so the
-# wallycore build sees the same headers and symbols as the Linux build.
+# -- Bundled secp256k1 ------------------------------------------------
+# Standard module set: ecdh/recovery/extrakeys/schnorrsig are the only ones
+# libwally's non-elements code references.  The zkp-only modules
+# (generator/rangeproof/surjectionproof/whitelist/ecdsa-s2c) are for Elements
+# confidential-transaction support, which seedmix does not use.
 set(SECP256K1_ENABLE_MODULE_ECDH ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_RECOVERY ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_EXTRAKEYS ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_SCHNORRSIG ON CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_ELLSWIFT OFF CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_GENERATOR ON CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_RANGEPROOF ON CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_SURJECTIONPROOF ON CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_WHITELIST ON CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_GENERATOR OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_RANGEPROOF OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_SURJECTIONPROOF OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_WHITELIST OFF CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_MUSIG OFF CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_ECDSA_ADAPTOR OFF CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_ECDSA_S2C ON CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_ECDSA_S2C OFF CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_BPPP OFF CACHE BOOL "" FORCE)
 set(SECP256K1_ENABLE_MODULE_SCHNORRSIG_HALFAGG OFF CACHE BOOL "" FORCE)
 set(SECP256K1_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
@@ -55,7 +57,7 @@ file(GLOB wally_srcs "${WALLY_DIR}/src/*.[ch]")
 
 add_library(wallycore STATIC ${ccan_srcs} ${wally_srcs})
 
-target_compile_definitions(wallycore PRIVATE BUILD_ELEMENTS)
+target_compile_definitions(wallycore PRIVATE BUILD_STANDARD_SECP)
 # The component's own config.h/ccan_config.h shadow the autotools-generated
 # src/config.h, so list the component dir before the vendored src dir.  The
 # bundled secp256k1 headers are also added directly because its CMake only
