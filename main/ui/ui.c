@@ -5,7 +5,8 @@
 
 #include "ui.h"
 #include "assets/logo_img.h"
-#include "assets/splash_img.h"
+#include "assets/splash_480x320_img.h"
+#include "assets/splash_240x135_img.h"
 #include "mnemonic_view.h"
 #include "src/widgets/label/lv_label_private.h"
 #include "ui_internal.h"
@@ -63,6 +64,64 @@ lv_obj_t* ui_make_screen(void) {
     lv_obj_t* s = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(s, lv_color_black(), 0);
     return s;
+}
+
+/* -- UI scaling ------------------------------------------------------- */
+/* The shared UI is laid out against a 480x320 reference resolution.  On
+ * smaller/larger displays everything is scaled by a single uniform factor
+ * (the limiting dimension) so screens keep their proportions and fit. */
+#define UI_REF_W 480
+#define UI_REF_H 320
+
+static uint16_t s_ui_scale_pct = 0; // 0 = not computed yet; 100 = 1.0x
+
+static void ui_scale_ensure(void) {
+    if (s_ui_scale_pct) return;
+    lv_display_t* d = lv_display_get_default();
+    int32_t       w = d ? lv_display_get_horizontal_resolution(d) : UI_REF_W;
+    int32_t       h = d ? lv_display_get_vertical_resolution(d) : UI_REF_H;
+    if (w <= 0) w = UI_REF_W;
+    if (h <= 0) h = UI_REF_H;
+
+    uint32_t sx = (uint32_t)w * 100u / UI_REF_W;
+    uint32_t sy = (uint32_t)h * 100u / UI_REF_H;
+    uint32_t s  = sx < sy ? sx : sy;
+    if (s < 25) s = 25;   // never shrink below 25%
+    if (s > 200) s = 200; // never grow beyond 2x
+    s_ui_scale_pct = (uint16_t)s;
+}
+
+lv_coord_t ui_scale(lv_coord_t n) {
+    if (n == 0) return 0;
+    ui_scale_ensure();
+    return (lv_coord_t)(((int64_t)n * s_ui_scale_pct + 50) / 100);
+}
+
+const lv_font_t* ui_font(uint8_t px) {
+    static const struct {
+        uint8_t          px;
+        const lv_font_t* font;
+    } fonts[] = {
+        {10, &lv_font_montserrat_10},
+        {12, &lv_font_montserrat_12},
+        {14, &lv_font_montserrat_14},
+        {18, &lv_font_montserrat_18},
+        {20, &lv_font_montserrat_20},
+        {24, &lv_font_montserrat_24},
+        {28, &lv_font_montserrat_28},
+        {48, &lv_font_montserrat_48},
+    };
+
+    lv_coord_t       want = ui_scale(px);
+    const lv_font_t* best = fonts[0].font;
+    for (size_t i = 0; i < sizeof(fonts) / sizeof(fonts[0]); i++) {
+        if ((lv_coord_t)fonts[i].px <= want) {
+            best = fonts[i].font;
+        } else {
+            break;
+        }
+    }
+    return best;
 }
 
 // Deferred screen deletion - safe to call from event handlers
@@ -131,8 +190,8 @@ lv_obj_t* ui_add_title(lv_obj_t* parent, const char* text) {
     lv_obj_t* t = lv_label_create(parent);
     lv_label_set_text(t, text);
     lv_obj_set_style_text_color(t, lv_color_white(), 0);
-    lv_obj_set_style_text_font(t, &lv_font_montserrat_28, 0);
-    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 15);
+    lv_obj_set_style_text_font(t, ui_font(28), 0);
+    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, ui_scale(15));
     return t;
 }
 
@@ -147,25 +206,25 @@ void ui_btn_invoke(lv_event_t* e) {
 
 /* -- Button creation -------------------------------------------------- */
 static const struct {
-    lv_coord_t       w;
-    lv_coord_t       h;
-    const lv_font_t* font;
+    lv_coord_t w;
+    lv_coord_t h;
+    uint8_t    font_px; // reference font size, scaled via ui_font()
 } btn_sizes[] = {
-    [UI_BTN_SIZE_SMALL] = {80, 30, &lv_font_montserrat_14},
-    [UI_BTN_SIZE_MED]   = {160, 44, &lv_font_montserrat_24},
-    [UI_BTN_SIZE_LARGE] = {200, 44, &lv_font_montserrat_24},
-    [UI_BTN_SIZE_WIDE]  = {180, 44, &lv_font_montserrat_24},
-    [UI_BTN_SIZE_HERO]  = {240, 56, &lv_font_montserrat_28},
+    [UI_BTN_SIZE_SMALL] = {80, 30, 14},
+    [UI_BTN_SIZE_MED]   = {160, 44, 24},
+    [UI_BTN_SIZE_LARGE] = {200, 44, 24},
+    [UI_BTN_SIZE_WIDE]  = {180, 44, 24},
+    [UI_BTN_SIZE_HERO]  = {240, 56, 28},
 };
 
 static lv_obj_t* add_btn_impl(lv_obj_t* parent, const char* text, ui_btn_size_t size,
                               lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs) {
     lv_obj_t* b = lv_button_create(parent);
-    lv_obj_set_size(b, btn_sizes[size].w, btn_sizes[size].h);
-    lv_obj_align(b, align, x_ofs, y_ofs);
+    lv_obj_set_size(b, ui_scale(btn_sizes[size].w), ui_scale(btn_sizes[size].h));
+    lv_obj_align(b, align, ui_scale(x_ofs), ui_scale(y_ofs));
     lv_obj_t* l = lv_label_create(b);
     lv_label_set_text(l, text);
-    lv_obj_set_style_text_font(l, btn_sizes[size].font, 0);
+    lv_obj_set_style_text_font(l, ui_font(btn_sizes[size].font_px), 0);
     lv_obj_center(l);
     return b;
 }
@@ -215,11 +274,44 @@ static void splash_timer_cb(lv_timer_t* t) {
     lv_obj_delete(screen);  // splash is no longer active - safe to free
 }
 
+/* Splash variants are keyed by their native resolution.  Pick the one whose
+ * aspect ratio is closest to the active display so any panel (desktop, TTGO,
+ * or a future device) gets crisp, undistorted art.  Add a new entry here when
+ * a new splash_<W>x<H> asset is generated. */
+static const struct {
+    const lv_image_dsc_t* dsc;
+    int32_t               w;
+    int32_t               h;
+} s_splashes[] = {
+    {&splash_480x320_img_dsc, 480, 320}, // desktop SDL window
+    {&splash_240x135_img_dsc, 240, 135}, // TTGO T-Display landscape
+};
+
+static const lv_image_dsc_t* ui_pick_splash(void) {
+    int32_t w = LV_HOR_RES, h = LV_VER_RES;
+    if (w <= 0 || h <= 0) return s_splashes[0].dsc;
+
+    int32_t             disp_ar    = (w * 1000) / h;
+    const lv_image_dsc_t* best      = s_splashes[0].dsc;
+    int32_t             best_delta = 0x7fffffff;
+    for (size_t i = 0; i < sizeof(s_splashes) / sizeof(s_splashes[0]); i++) {
+        int32_t ar    = (s_splashes[i].w * 1000) / s_splashes[i].h;
+        int32_t delta = LV_ABS(disp_ar - ar);
+        if (delta < best_delta) {
+            best_delta = delta;
+            best       = s_splashes[i].dsc;
+        }
+    }
+    return best;
+}
+
 void ui_show_splash(ui_cb_t on_done) {
     lv_obj_t* s = ui_make_screen();
 
     lv_obj_t* img = lv_image_create(s);
-    lv_image_set_src(img, &splash_img_dsc);
+    lv_image_set_src(img, ui_pick_splash());
+    lv_obj_set_size(img, LV_PCT(100), LV_PCT(100));
+    lv_image_set_inner_align(img, LV_IMAGE_ALIGN_STRETCH);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     ui_nav_build(s);
@@ -247,7 +339,9 @@ void ui_show_main(lv_event_cb_t on_new_wallet, lv_event_cb_t on_test_error) {
 
         lv_obj_t* logo = lv_image_create(scr);
         lv_image_set_src(logo, &logo_img_dsc);
-        lv_obj_align(logo, LV_ALIGN_TOP_LEFT, 10, 10);
+        lv_obj_set_size(logo, ui_scale(157), ui_scale(40));
+        lv_image_set_inner_align(logo, LV_IMAGE_ALIGN_STRETCH);
+        lv_obj_align(logo, LV_ALIGN_TOP_LEFT, ui_scale(10), ui_scale(10));
 
         ui_add_btn_evt(scr, "New Wallet", on_new_wallet, NULL, UI_BTN_SIZE_HERO, LV_ALIGN_CENTER, 0,
                        0);
@@ -372,7 +466,7 @@ void ui_show_touch_screen(ui_tap_cb_t on_tap, ui_cb_t on_cancel) {
     lv_obj_add_event_cb(touch_status, touch_status_delete_cb, LV_EVENT_DELETE, NULL);
     lv_label_set_text(touch_status, "Tap anywhere to collect entropy");
     lv_obj_set_style_text_color(touch_status, lv_color_hex(0x888888), 0);
-    lv_obj_set_style_text_font(touch_status, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(touch_status, ui_font(18), 0);
     lv_obj_set_style_text_align(touch_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(touch_status, LV_ALIGN_CENTER, 0, 0);
 
@@ -380,8 +474,8 @@ void ui_show_touch_screen(ui_tap_cb_t on_tap, ui_cb_t on_cancel) {
     // A short tap passes through and still collects entropy, hold (long
     // press) to activate cancel.
     lv_obj_t* cancel_btn = lv_button_create(s);
-    lv_obj_set_size(cancel_btn, 240, 44);
-    lv_obj_align(cancel_btn, LV_ALIGN_CENTER, 0, 70);
+    lv_obj_set_size(cancel_btn, ui_scale(240), ui_scale(44));
+    lv_obj_align(cancel_btn, LV_ALIGN_CENTER, 0, ui_scale(70));
     lv_obj_add_event_cb(cancel_btn, touch_area_tap_cb, LV_EVENT_CLICKED, u.vp);
     union {
         ui_cb_t fn;
@@ -390,7 +484,7 @@ void ui_show_touch_screen(ui_tap_cb_t on_tap, ui_cb_t on_cancel) {
     lv_obj_add_event_cb(cancel_btn, ui_btn_invoke, LV_EVENT_LONG_PRESSED, u_cancel.vp);
     lv_obj_t* cancel_lbl = lv_label_create(cancel_btn);
     lv_label_set_text(cancel_lbl, "Cancel (hold to activate)");
-    lv_obj_set_style_text_font(cancel_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(cancel_lbl, ui_font(14), 0);
     lv_obj_center(cancel_lbl);
 
     ui_swap_screen(s);
@@ -421,9 +515,9 @@ void ui_show_dice_sides(ui_uint_cb_t on_sides, ui_cb_t on_back) {
     lv_obj_t* lbl = lv_label_create(s);
     lv_label_set_text(lbl, "How many sides?");
     lv_obj_set_style_text_color(lbl, lv_color_hex(0x888888), 0);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(lbl, ui_font(18), 0);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(lbl, LV_ALIGN_TOP_MID, 0, 60);
+    lv_obj_align(lbl, LV_ALIGN_TOP_MID, 0, ui_scale(60));
 
     static const unsigned sides[] = {2, 4, 6, 8, 10, 12, 20};
     for (size_t i = 0; i < sizeof(sides) / sizeof(sides[0]); i++) {
@@ -433,13 +527,13 @@ void ui_show_dice_sides(ui_uint_cb_t on_sides, ui_cb_t on_back) {
         snprintf(face, sizeof(face), "%u", sides[i]);
 
         lv_obj_t* b = lv_button_create(s);
-        lv_obj_set_size(b, 80, 52);
-        lv_obj_align(b, LV_ALIGN_CENTER, (col - 1) * 92, -10 + row * 68);
+        lv_obj_set_size(b, ui_scale(80), ui_scale(52));
+        lv_obj_align(b, LV_ALIGN_CENTER, ui_scale((col - 1) * 92), ui_scale(-10 + row * 68));
         lv_obj_add_event_cb(b, dice_sides_btn_cb, LV_EVENT_CLICKED, (void*)(uintptr_t)sides[i]);
 
         lv_obj_t* l = lv_label_create(b);
         lv_label_set_text(l, face);
-        lv_obj_set_style_text_font(l, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_font(l, ui_font(24), 0);
         lv_obj_center(l);
     }
 
@@ -477,20 +571,20 @@ void ui_show_dice(unsigned sides, ui_uint_cb_t on_roll, ui_cb_t on_cancel) {
     lv_obj_add_event_cb(dice_status, dice_status_delete_cb, LV_EVENT_DELETE, NULL);
     lv_label_set_text(dice_status, "Roll the die, tap the result");
     lv_obj_set_style_text_color(dice_status, lv_color_hex(0x888888), 0);
-    lv_obj_set_style_text_font(dice_status, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(dice_status, ui_font(18), 0);
     lv_obj_set_style_text_align(dice_status, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(dice_status, LV_ALIGN_TOP_MID, 0, 60);
+    lv_obj_align(dice_status, LV_ALIGN_TOP_MID, 0, ui_scale(60));
 
     // 1..sides face buttons, wrapped into a scrollable grid.
     lv_obj_t* grid = lv_obj_create(s);
-    lv_obj_set_size(grid, 440, 180);
-    lv_obj_align(grid, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_set_size(grid, ui_scale(440), ui_scale(180));
+    lv_obj_align(grid, LV_ALIGN_CENTER, 0, ui_scale(20));
     lv_obj_set_style_bg_color(grid, lv_color_black(), 0);
     lv_obj_set_style_border_width(grid, 0, 0);
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(grid, 8, 0);
-    lv_obj_set_style_pad_column(grid, 8, 0);
+    lv_obj_set_style_pad_row(grid, ui_scale(8), 0);
+    lv_obj_set_style_pad_column(grid, ui_scale(8), 0);
     lv_obj_set_scroll_dir(grid, LV_DIR_VER);
 
     for (unsigned v = 1; v <= sides; v++) {
@@ -498,12 +592,12 @@ void ui_show_dice(unsigned sides, ui_uint_cb_t on_roll, ui_cb_t on_cancel) {
         snprintf(face, sizeof(face), "%u", v);
 
         lv_obj_t* b = lv_button_create(grid);
-        lv_obj_set_size(b, 64, 48);
+        lv_obj_set_size(b, ui_scale(64), ui_scale(48));
         lv_obj_add_event_cb(b, dice_btn_cb, LV_EVENT_CLICKED, (void*)(uintptr_t)v);
 
         lv_obj_t* l = lv_label_create(b);
         lv_label_set_text(l, face);
-        lv_obj_set_style_text_font(l, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_font(l, ui_font(24), 0);
         lv_obj_center(l);
     }
 
@@ -547,9 +641,9 @@ void ui_show_coin(ui_uint_cb_t on_flip, ui_cb_t on_cancel) {
     lv_obj_add_event_cb(coin_status, coin_status_delete_cb, LV_EVENT_DELETE, NULL);
     lv_label_set_text(coin_status, "Flip a coin, tap the result");
     lv_obj_set_style_text_color(coin_status, lv_color_hex(0x888888), 0);
-    lv_obj_set_style_text_font(coin_status, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(coin_status, ui_font(18), 0);
     lv_obj_set_style_text_align(coin_status, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(coin_status, LV_ALIGN_TOP_MID, 0, 60);
+    lv_obj_align(coin_status, LV_ALIGN_TOP_MID, 0, ui_scale(60));
 
     ui_add_btn_evt(s, "Heads", coin_btn_cb, NULL, UI_BTN_SIZE_WIDE, LV_ALIGN_CENTER, -95, 20);
     ui_add_btn_evt(s, "Tails", coin_btn_cb, NULL, UI_BTN_SIZE_WIDE, LV_ALIGN_CENTER, 95, 20);
@@ -575,8 +669,8 @@ void ui_show_camera_feed(ui_cb_t on_use, ui_cb_t on_cancel) {
     camera_dsc.header.cf    = LV_COLOR_FORMAT_RGB565;
 
     camera_img = lv_image_create(s);
-    lv_obj_set_size(camera_img, 300, 200);
-    lv_obj_align(camera_img, LV_ALIGN_TOP_MID, 0, 45);
+    lv_obj_set_size(camera_img, ui_scale(300), ui_scale(200));
+    lv_obj_align(camera_img, LV_ALIGN_TOP_MID, 0, ui_scale(45));
 
     /* "Use Image" (left) and "Cancel" (right). */
     ui_add_btn(s, "Use Image", on_use, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_LEFT, 20, -10);
@@ -590,11 +684,13 @@ void ui_camera_feed_update(const uint8_t* rgb565, uint32_t w, uint32_t h) {
     ASSERT_OR_DIE(rgb565, "null rgb565");
     ASSERT_OR_DIE(w > 0 && h > 0, "invalid camera frame size");
 
-    // Fit the frame into the 300x200 preview area, preserving aspect ratio
+    // Fit the frame into the scaled preview area, preserving aspect ratio
+    uint32_t preview_w = (uint32_t)ui_scale(300);
+    uint32_t preview_h = (uint32_t)ui_scale(200);
     uint32_t disp_w = w, disp_h = h;
-    if (w > 300 || h > 200) {
-        uint32_t zx = (256 * 300) / w;
-        uint32_t zy = (256 * 200) / h;
+    if (w > preview_w || h > preview_h) {
+        uint32_t zx = (256 * preview_w) / w;
+        uint32_t zy = (256 * preview_h) / h;
         uint32_t z  = (zx < zy) ? zx : zy;
         disp_w      = (w * z) / 256;
         disp_h      = (h * z) / 256;
@@ -624,13 +720,13 @@ void ui_show_seedqr(const uint8_t* cells, uint32_t size, ui_cb_t on_done) {
     lv_obj_t* t = lv_label_create(s);
     lv_label_set_text(t, "SeedQR");
     lv_obj_set_style_text_color(t, lv_color_white(), 0);
-    lv_obj_set_style_text_font(t, &lv_font_montserrat_28, 0);
-    lv_obj_align(t, LV_ALIGN_TOP_RIGHT, -35, 15);
+    lv_obj_set_style_text_font(t, ui_font(28), 0);
+    lv_obj_align(t, LV_ALIGN_TOP_RIGHT, ui_scale(-35), ui_scale(15));
 
     // White quiet-zone border (4 modules), then the data modules
     uint32_t border = 4;
     uint32_t total  = size + 2 * border;
-    uint32_t scale  = 300 / total; // full screen height
+    uint32_t scale  = (uint32_t)ui_scale(300) / total; // fit screen height
     if (scale < 4) scale = 4;
     uint32_t px = scale * total;
 
@@ -666,7 +762,7 @@ void ui_show_seedqr(const uint8_t* cells, uint32_t size, ui_cb_t on_done) {
 
     lv_obj_t* img = lv_image_create(s);
     lv_image_set_src(img, &seedqr_dsc);
-    lv_obj_align(img, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_align(img, LV_ALIGN_LEFT_MID, ui_scale(10), 0);
 
     ui_add_btn(s, "Done", on_done, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
@@ -693,8 +789,8 @@ void ui_show_qr_scan(ui_cb_t on_scan, ui_cb_t on_cancel) {
     camera_dsc.header.cf    = LV_COLOR_FORMAT_RGB565;
 
     camera_img = lv_image_create(s);
-    lv_obj_set_size(camera_img, 300, 200);
-    lv_obj_align(camera_img, LV_ALIGN_TOP_MID, 0, 45);
+    lv_obj_set_size(camera_img, ui_scale(300), ui_scale(200));
+    lv_obj_align(camera_img, LV_ALIGN_TOP_MID, 0, ui_scale(45));
 
     ui_add_btn(s, "Scan", on_scan, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_LEFT, 20, -10);
     ui_add_btn(s, "Cancel", on_cancel, UI_BTN_SIZE_WIDE, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
@@ -732,13 +828,13 @@ void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok, ui
         lv_obj_t* w = lv_label_create(s);
         lv_label_set_text(w, "Write these words down.\nNever share them!");
         lv_obj_set_style_text_color(w, lv_color_hex(0xFF4444), 0);
-        lv_obj_set_style_text_font(w, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(w, ui_font(14), 0);
         lv_obj_set_style_text_align(w, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(w, LV_ALIGN_TOP_MID, 0, 55);
+        lv_obj_align(w, LV_ALIGN_TOP_MID, 0, ui_scale(55));
     }
 
     lv_obj_t* grid = ui_mnemonic_view_create(s);
-    lv_obj_align(grid, LV_ALIGN_TOP_MID, 0, show_warning ? 85 : 55);
+    lv_obj_align(grid, LV_ALIGN_TOP_MID, 0, ui_scale(show_warning ? 85 : 55));
     ui_mnemonic_view_set_words(grid, words);
     lv_obj_update_layout(grid);
 
@@ -747,7 +843,7 @@ void ui_show_mnemonic(const char* words, mnemonic_type_t type, ui_cb_t on_ok, ui
         ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
     } else {
         lv_obj_t* ok = ui_add_btn(s, "Ok", on_ok, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_align_to(ok, grid, LV_ALIGN_OUT_BOTTOM_MID, 0, 12);
+        lv_obj_align_to(ok, grid, LV_ALIGN_OUT_BOTTOM_MID, 0, ui_scale(12));
     }
 
     ui_swap_screen(s);
@@ -762,8 +858,8 @@ void ui_show_merge_process(const char* current_words, const char* current_entrop
     ui_add_title(s, "Merging Entropy");
 
     lv_obj_t* cont = lv_obj_create(s);
-    lv_obj_set_size(cont, 440, 200);
-    lv_obj_align(cont, LV_ALIGN_TOP_MID, 0, 50);
+    lv_obj_set_size(cont, ui_scale(440), ui_scale(200));
+    lv_obj_align(cont, LV_ALIGN_TOP_MID, 0, ui_scale(50));
     lv_obj_set_style_bg_color(cont, lv_color_hex(0x111111), 0);
     lv_obj_set_style_border_width(cont, 0, 0);
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
@@ -788,14 +884,14 @@ void ui_show_merge_process(const char* current_words, const char* current_entrop
             lv_obj_t* lbl = lv_label_create(cont);
             lv_label_set_text(lbl, lines[i].label);
             lv_obj_set_style_text_color(lbl, lv_color_hex(0x888888), 0);
-            lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
+            lv_obj_set_style_text_font(lbl, ui_font(14), 0);
         }
         if (lines[i].value[0]) {
             lv_obj_t* val = lv_label_create(cont);
             lv_label_set_text(val, lines[i].value);
             lv_obj_set_style_text_color(val, lv_color_white(), 0);
-            lv_obj_set_style_text_font(val, &lv_font_montserrat_14, 0);
-            lv_obj_set_width(val, 420);
+            lv_obj_set_style_text_font(val, ui_font(14), 0);
+            lv_obj_set_width(val, ui_scale(420));
             lv_label_set_long_mode(val, LV_LABEL_LONG_WRAP);
         }
     }
@@ -815,10 +911,10 @@ void ui_show_enter_words(ui_cb_t on_ok) {
 
     lv_obj_t* ta = lv_textarea_create(s);
     entered_ta   = ta; // store for later retrieval
-    lv_obj_set_size(ta, 420, 180);
-    lv_obj_align(ta, LV_ALIGN_CENTER, 0, -20);
+    lv_obj_set_size(ta, ui_scale(420), ui_scale(180));
+    lv_obj_align(ta, LV_ALIGN_CENTER, 0, ui_scale(-20));
     lv_textarea_set_placeholder_text(ta, "Type your mnemonic words here...");
-    lv_obj_set_style_text_font(ta, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(ta, ui_font(14), 0);
     lv_obj_add_event_cb(ta, NULL, LV_EVENT_ALL, NULL); // just to hold reference
 
     ui_add_btn(s, "OK", on_ok, UI_BTN_SIZE_LARGE, LV_ALIGN_CENTER, 0, 100);
@@ -841,9 +937,9 @@ void ui_show_msg(const char* msg) {
     lv_obj_t* l = lv_label_create(s);
     lv_label_set_text(l, msg);
     lv_obj_set_style_text_color(l, lv_color_white(), 0);
-    lv_obj_set_style_text_font(l, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(l, ui_font(24), 0);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(l, 440);
+    lv_obj_set_width(l, ui_scale(440));
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
     lv_obj_align(l, LV_ALIGN_CENTER, 0, 0);
     ui_swap_screen(s);

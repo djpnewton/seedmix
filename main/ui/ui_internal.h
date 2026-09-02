@@ -27,6 +27,19 @@ void      ui_btn_invoke(lv_event_t* e);
 void      ui_swap_screen(lv_obj_t* new_scr);
 
 /**
+ * Scale a pixel value laid out against the 480x320 reference resolution to
+ * the active display.  The scale is uniform (limited by the shorter axis) so
+ * screens keep their proportions and fit on any panel.
+ */
+lv_coord_t ui_scale(lv_coord_t n);
+
+/**
+ * Pick the best bundled Montserrat font for a reference pixel size on the
+ * active display (never smaller than 10 px).
+ */
+const lv_font_t* ui_font(uint8_t px);
+
+/**
  * Rebuild the shared navigation group from the focusable widgets on @p scr
  * and focus the first one.  No-op when no navigation input device has been
  * attached (e.g. on desktop builds).

@@ -4,6 +4,7 @@
  */
 
 #include "mnemonic_view.h"
+#include "ui_internal.h"
 #include "util/error.h"
 #include "util/utils.h"
 #include <stdio.h>
@@ -18,7 +19,7 @@ lv_obj_t* ui_mnemonic_view_create(lv_obj_t* parent) {
     ASSERT_OR_DIE(parent, "null parent");
 
     lv_obj_t* view = lv_obj_create(parent);
-    lv_obj_set_size(view, 460, LV_SIZE_CONTENT);
+    lv_obj_set_size(view, ui_scale(460), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_color(view, lv_color_hex(0x111111), 0);
     lv_obj_set_style_border_width(view, 0, 0);
     lv_obj_set_style_pad_all(view, 4, 0);
@@ -58,7 +59,7 @@ void ui_mnemonic_view_set_words(lv_obj_t* view, const char* words) {
     int32_t row_dsc[7]; /* up to 6 rows (24 words / 4 cols) + terminator */
     for (unsigned c = 0; c < cols; c++) col_dsc[c] = LV_GRID_FR(1);
     col_dsc[cols] = LV_GRID_TEMPLATE_LAST;
-    for (unsigned r = 0; r < rows; r++) row_dsc[r] = MNEMONIC_VIEW_ROW_H;
+    for (unsigned r = 0; r < rows; r++) row_dsc[r] = ui_scale(MNEMONIC_VIEW_ROW_H);
     row_dsc[rows] = LV_GRID_TEMPLATE_LAST;
 
     lv_obj_set_grid_dsc_array(view, col_dsc, row_dsc);
@@ -87,13 +88,13 @@ void ui_mnemonic_view_set_words(lv_obj_t* view, const char* words) {
         lv_obj_t* num_lbl = lv_label_create(cell);
         lv_label_set_text(num_lbl, num);
         lv_obj_set_style_text_color(num_lbl, lv_color_hex(0x888888), 0);
-        lv_obj_set_style_text_font(num_lbl, &lv_font_montserrat_14, 0);
-        lv_obj_set_style_min_width(num_lbl, 20, 0);
+        lv_obj_set_style_text_font(num_lbl, ui_font(14), 0);
+        lv_obj_set_style_min_width(num_lbl, ui_scale(20), 0);
 
         lv_obj_t* word_lbl = lv_label_create(cell);
         lv_label_set_text(word_lbl, word[i]);
         lv_obj_set_style_text_color(word_lbl, lv_color_white(), 0);
-        lv_obj_set_style_text_font(word_lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(word_lbl, ui_font(14), 0);
         lv_label_set_long_mode(word_lbl, LV_LABEL_LONG_DOT);
     }
 

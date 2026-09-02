@@ -51,15 +51,15 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
         mn_area = lv_label_create(s);
         lv_label_set_text(mn_area, "(no mnemonic yet)");
         lv_obj_set_style_text_color(mn_area, lv_color_hex(0x888888), 0);
-        lv_obj_set_style_text_font(mn_area, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_font(mn_area, ui_font(18), 0);
     }
-    lv_obj_align(mn_area, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_align(mn_area, LV_ALIGN_TOP_MID, 0, ui_scale(48));
     lv_obj_update_layout(mn_area);
 
     // Cap tall grids (24 words) so the log below always has room; allow scroll.
     lv_coord_t mn_h = lv_obj_get_height(mn_area);
-    if (mnemonic_words && mnemonic_words[0] && mn_h > 150) {
-        lv_obj_set_height(mn_area, 150);
+    if (mnemonic_words && mnemonic_words[0] && mn_h > ui_scale(150)) {
+        lv_obj_set_height(mn_area, ui_scale(150));
         lv_obj_add_flag(mn_area, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_scroll_dir(mn_area, LV_DIR_VER);
     }
@@ -79,17 +79,17 @@ void ui_show_state(ui_cb_t on_back, const char* mnemonic_words) {
         lv_obj_t* entry = lv_label_create(log_cont);
         lv_label_set_text(entry, log_buf[idx]);
         lv_obj_set_style_text_color(entry, lv_color_hex(0xAAAAAA), 0);
-        lv_obj_set_style_text_font(entry, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(entry, ui_font(14), 0);
         lv_label_set_long_mode(entry, LV_LABEL_LONG_WRAP);
-        lv_obj_set_width(entry, 420);
+        lv_obj_set_width(entry, ui_scale(420));
     }
 
     // Fit the log between the mnemonic area and the back button.
     lv_coord_t mn_bottom = lv_obj_get_y(mn_area) + lv_obj_get_height(mn_area);
-    lv_coord_t log_top   = mn_bottom + 8;
-    lv_coord_t log_h     = (320 - 10 - 44) - 8 - log_top; /* above back button */
+    lv_coord_t log_top   = mn_bottom + ui_scale(8);
+    lv_coord_t log_h     = (LV_VER_RES - ui_scale(10) - ui_scale(44)) - ui_scale(8) - log_top; /* above back button */
     if (log_h < 40) log_h = 40;
-    lv_obj_set_size(log_cont, 440, log_h);
+    lv_obj_set_size(log_cont, ui_scale(440), log_h);
     lv_obj_align(log_cont, LV_ALIGN_TOP_MID, 0, log_top);
 
     // back button

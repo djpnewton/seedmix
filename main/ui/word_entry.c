@@ -53,7 +53,7 @@ static void we_refresh_matches(we_ctx_t* c) {
         lv_obj_t* lbl = lv_label_create(c->match_container);
         lv_label_set_text(lbl, match_buf[i]);
         lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
-        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(lbl, ui_font(14), 0);
         lv_obj_set_style_bg_color(lbl, lv_color_hex(0x333333), 0);
         lv_obj_set_style_pad_hor(lbl, 8, 0);
         lv_obj_set_style_pad_ver(lbl, 4, 0);
@@ -106,14 +106,14 @@ static void we_select_word(lv_event_t* e) {
         lv_obj_t* title = lv_label_create(s);
         lv_label_set_text(title, "Confirm Word");
         lv_obj_set_style_text_color(title, lv_color_white(), 0);
-        lv_obj_set_style_text_font(title, &lv_font_montserrat_28, 0);
-        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 15);
+        lv_obj_set_style_text_font(title, ui_font(28), 0);
+        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, ui_scale(15));
 
         lv_obj_t* w = lv_label_create(s);
         lv_label_set_text(w, word);
         lv_obj_set_style_text_color(w, lv_color_white(), 0);
-        lv_obj_set_style_text_font(w, &lv_font_montserrat_48, 0);
-        lv_obj_align(w, LV_ALIGN_CENTER, 0, -10);
+        lv_obj_set_style_text_font(w, ui_font(48), 0);
+        lv_obj_align(w, LV_ALIGN_CENTER, 0, ui_scale(-10));
 
         ui_add_btn_evt(s, "Yes", we_confirm, c, UI_BTN_SIZE_MED, LV_ALIGN_CENTER, -90, 60);
 
@@ -165,13 +165,13 @@ word_entry_handle_t ui_word_entry_begin(unsigned total_words, ui_cb_t on_done, u
 
     c->status = lv_label_create(s);
     lv_obj_set_style_text_color(c->status, lv_color_white(), 0);
-    lv_obj_set_style_text_font(c->status, &lv_font_montserrat_20, 0);
-    lv_obj_align(c->status, LV_ALIGN_TOP_MID, 0, 5);
+    lv_obj_set_style_text_font(c->status, ui_font(20), 0);
+    lv_obj_align(c->status, LV_ALIGN_TOP_MID, 0, ui_scale(5));
 
     lv_obj_t* ta = lv_textarea_create(s);
-    lv_obj_set_size(ta, 380, 40);
-    lv_obj_align(ta, LV_ALIGN_TOP_MID, 0, 30);
-    lv_obj_set_style_text_font(ta, &lv_font_montserrat_24, 0);
+    lv_obj_set_size(ta, ui_scale(380), ui_scale(40));
+    lv_obj_align(ta, LV_ALIGN_TOP_MID, 0, ui_scale(30));
+    lv_obj_set_style_text_font(ta, ui_font(24), 0);
     lv_obj_set_style_bg_color(ta, lv_color_hex(0x222222), 0);
     lv_obj_set_style_text_color(ta, lv_color_white(), 0);
     lv_textarea_set_placeholder_text(ta, "Type to filter...");
@@ -179,8 +179,8 @@ word_entry_handle_t ui_word_entry_begin(unsigned total_words, ui_cb_t on_done, u
     we_update_status(c);
 
     c->match_container = lv_obj_create(s);
-    lv_obj_set_size(c->match_container, 440, 30);
-    lv_obj_align(c->match_container, LV_ALIGN_TOP_MID, 0, 78);
+    lv_obj_set_size(c->match_container, ui_scale(440), ui_scale(30));
+    lv_obj_align(c->match_container, LV_ALIGN_TOP_MID, 0, ui_scale(78));
     lv_obj_set_style_bg_color(c->match_container, lv_color_hex(0x111111), 0);
     lv_obj_set_style_border_width(c->match_container, 0, 0);
     lv_obj_set_flex_flow(c->match_container, LV_FLEX_FLOW_ROW);

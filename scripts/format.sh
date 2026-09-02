@@ -57,8 +57,10 @@ fi
 # -- Apply exclusions -----------------------------------------------------
 EXCLUDE_FILES=(
     "$PROJECT_ROOT/main/lv_conf.h"
-    "$PROJECT_ROOT/main/assets/splash_img.c"
-    "$PROJECT_ROOT/main/assets/splash_img.h"
+    "$PROJECT_ROOT/main/assets/splash_480x320_img.c"
+    "$PROJECT_ROOT/main/assets/splash_480x320_img.h"
+    "$PROJECT_ROOT/main/assets/splash_240x135_img.c"
+    "$PROJECT_ROOT/main/assets/splash_240x135_img.h"
     "$PROJECT_ROOT/main/assets/logo_img.c"
     "$PROJECT_ROOT/main/assets/logo_img.h"
 )
