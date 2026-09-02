@@ -26,6 +26,13 @@ lv_obj_t* ui_add_title(lv_obj_t* parent, const char* text);
 void      ui_btn_invoke(lv_event_t* e);
 void      ui_swap_screen(lv_obj_t* new_scr);
 
+/**
+ * Rebuild the shared navigation group from the focusable widgets on @p scr
+ * and focus the first one.  No-op when no navigation input device has been
+ * attached (e.g. on desktop builds).
+ */
+void ui_nav_build(lv_obj_t* scr);
+
 /** Create a button with a plain void(void) callback. */
 lv_obj_t* ui_add_btn(lv_obj_t* parent, const char* text, ui_cb_t cb, ui_btn_size_t size,
                      lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs);

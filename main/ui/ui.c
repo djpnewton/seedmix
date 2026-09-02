@@ -28,6 +28,8 @@ static lv_obj_t* entered_ta = NULL;
 static char      entered_buf[512];
 static lv_obj_t* prev_screen = NULL; // track for deferred cleanup
 
+static lv_group_t* s_nav_group = NULL; // button navigation group (ESP32 keypad)
+
 static lv_obj_t*      camera_img = NULL;       // live camera feed image widget
 static lv_image_dsc_t camera_dsc;              // descriptor backing the live feed
 static lv_image_dsc_t seedqr_dsc;              // descriptor backing the SeedQR image
@@ -72,11 +74,56 @@ static void delete_screen_cb(void* ptr) {
     }
 }
 
+/* -- Button navigation ------------------------------------------------ */
+static bool ui_nav_obj_is_focusable(const lv_obj_t* obj) {
+    if (lv_obj_has_state(obj, LV_STATE_DISABLED)) return false;
+
+    if (lv_obj_has_class(obj, &lv_button_class)) return true;
+    if (lv_obj_has_class(obj, &lv_textarea_class)) return true;
+    if (lv_obj_has_class(obj, &lv_buttonmatrix_class)) return true;
+    if (lv_obj_has_class(obj, &lv_label_class) && lv_obj_has_flag(obj, LV_OBJ_FLAG_CLICKABLE)) {
+        return true;
+    }
+    return false;
+}
+
+static void ui_nav_collect(lv_obj_t* obj) {
+    if (!obj) return;
+    if (lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN)) return;
+
+    if (ui_nav_obj_is_focusable(obj)) {
+        lv_group_add_obj(s_nav_group, obj);
+    }
+
+    uint32_t n = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < n; i++) {
+        ui_nav_collect(lv_obj_get_child(obj, i));
+    }
+}
+
+void ui_nav_set_indev(lv_indev_t* indev) {
+    if (!indev) return;
+
+    if (!s_nav_group) {
+        s_nav_group = lv_group_create();
+        if (!s_nav_group) return;
+        lv_group_set_wrap(s_nav_group, true);
+    }
+    lv_indev_set_group(indev, s_nav_group);
+}
+
+void ui_nav_build(lv_obj_t* scr) {
+    if (!s_nav_group || !scr) return;
+    lv_group_remove_all_objs(s_nav_group);
+    ui_nav_collect(scr);
+}
+
 void ui_swap_screen(lv_obj_t* new_scr) {
     if (prev_screen && prev_screen != main_scr) {
         lv_async_call(delete_screen_cb, prev_screen);
     }
     prev_screen = new_scr;
+    ui_nav_build(new_scr);
     lv_scr_load(new_scr);
 }
 
@@ -144,7 +191,10 @@ lv_obj_t* ui_add_btn_evt(lv_obj_t* parent, const char* text, lv_event_cb_t evt_c
 }
 
 void ui_go_main(void) {
-    if (main_scr) lv_scr_load(main_scr);
+    if (main_scr) {
+        ui_nav_build(main_scr);
+        lv_scr_load(main_scr);
+    }
 }
 
 /* -- Splash screen ---------------------------------------------------- */
@@ -172,6 +222,7 @@ void ui_show_splash(ui_cb_t on_done) {
     lv_image_set_src(img, &splash_img_dsc);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
+    ui_nav_build(s);
     lv_scr_load(s);
 
     splash_ctx_t* ctx = lv_malloc(sizeof(*ctx));
@@ -206,6 +257,7 @@ void ui_show_main(lv_event_cb_t on_new_wallet, lv_event_cb_t on_test_error) {
                                             UI_BTN_SIZE_SMALL, LV_ALIGN_BOTTOM_RIGHT, -40, -10);
         lv_obj_set_style_bg_color(test_btn, lv_color_hex(0x440000), 0);
     }
+    ui_nav_build(main_scr);
     lv_scr_load(main_scr);
     // clean up any leaked screen from before main was first shown
     if (prev_screen && prev_screen != main_scr) {
@@ -289,6 +341,7 @@ static void touch_area_tap_cb(lv_event_t* e) {
 
     lv_indev_t* indev = lv_event_get_indev(e);
     if (!indev) return;
+    if (lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) return;
     lv_point_t p;
     lv_indev_get_point(indev, &p);
     u.fn(p.x, p.y);
