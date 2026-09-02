@@ -27,7 +27,8 @@ message(STATUS "Building for Linux (prototype)")
 set(COMMON_SOURCES
     main/main.c
     main/ui/ui.c
-    main/assets/splash_img.c
+    main/assets/splash_480x320_img.c
+    main/assets/splash_240x135_img.c
     main/assets/logo_img.c
     main/ui/word_entry.c
     main/ui/mnemonic_view.c

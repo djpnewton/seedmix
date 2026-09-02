@@ -5,9 +5,9 @@ Inputs
     main/assets/seedmix.png   (source logo, RGBA)
 
 Outputs (previews + embedded LVGL RGB565 C arrays)
-    main/assets/splash.png   480x320: logo centered, "SEED MIX" text below
-    main/assets/logo.png     small: logo with "SEED MIX" to its right
-    main/assets/splash_img.{c,h}
+    main/assets/splash_<W>x<H>.png    splash rendered at each native resolution
+    main/assets/logo.png              small: logo with "SEED MIX" to its right
+    main/assets/splash_<W>x<H>_img.{c,h}
     main/assets/logo_img.{c,h}
 
 Usage:
@@ -103,18 +103,23 @@ def draw_brand(draw, cx, cy, parts, font):
         x += w
 
 
-def make_splash(logo_rgba):
-    img = Image.new("RGB", (480, 320), BLACK)
+def make_splash(logo_rgba, w, h):
+    """Render the splash at (w, h).  The composition is defined against the
+    480x320 reference and scaled uniformly by the limiting axis so the same
+    layout fits any target resolution without distortion."""
+    s = min(w / 480.0, h / 320.0)
+
+    img = Image.new("RGB", (w, h), BLACK)
     draw = ImageDraw.Draw(img)
 
-    logo_size = 184
+    logo_size = round(184 * s)
     logo = logo_rgba.resize((logo_size, logo_size), Image.LANCZOS)
-    logo_top = 34
-    img.paste(logo, (240 - logo_size // 2, logo_top), logo)
+    logo_top = round(34 * s)
+    img.paste(logo, (w // 2 - logo_size // 2, logo_top), logo)
 
-    font = load_font(52)
-    cy = logo_top + logo_size + 34
-    draw_brand(draw, 240, cy, [("SEED", LIGHT_GREEN), ("MIX", DARK_GREEN)], font)
+    font = load_font(max(8, round(52 * s)))
+    cy = logo_top + logo_size + round(34 * s)
+    draw_brand(draw, w / 2.0, cy, [("SEED", LIGHT_GREEN), ("MIX", DARK_GREEN)], font)
     return img
 
 
@@ -150,17 +155,27 @@ def make_logo(logo_rgba):
 def main():
     logo = Image.open(SRC).convert("RGBA")
 
-    splash = make_splash(logo)
-    splash.save(os.path.join(ASSETS, "splash.png"))
-    write_c_array(splash, os.path.join(ASSETS, "splash_img.c"),
-                  os.path.join(ASSETS, "splash_img.h"), "splash_img_map", "splash_img_dsc")
+    # Splash variants, keyed by their native resolution so any device whose
+    # panel matches (or is closest to) that aspect ratio can share the asset.
+    splash_resolutions = [
+        (480, 320),   # desktop SDL window
+        (240, 135),   # TTGO T-Display landscape
+    ]
+    for w, h in splash_resolutions:
+        base = f"splash_{w}x{h}"
+        map_name = f"{base}_img_map"
+        dsc_name = f"{base}_img_dsc"
+        splash = make_splash(logo, w, h)
+        splash.save(os.path.join(ASSETS, f"{base}.png"))
+        write_c_array(splash, os.path.join(ASSETS, f"{base}_img.c"),
+                      os.path.join(ASSETS, f"{base}_img.h"), map_name, dsc_name)
+        print(f"{base}: {splash.size} -> {base}.png / {base}_img.c")
 
     small = make_logo(logo)
     small.save(os.path.join(ASSETS, "logo.png"))
     write_c_array(small, os.path.join(ASSETS, "logo_img.c"),
                   os.path.join(ASSETS, "logo_img.h"), "logo_img_map", "logo_img_dsc")
 
-    print(f"splash: {splash.size} -> splash.png / splash_img.c")
     print(f"logo:   {small.size} -> logo.png / logo_img.c")
 
 

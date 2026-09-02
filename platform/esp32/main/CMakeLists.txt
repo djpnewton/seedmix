@@ -35,7 +35,8 @@ idf_component_register(
 set(SHARED_APP_SOURCES
     "${SHARED_MAIN_DIR}/main.c"
     "${SHARED_MAIN_DIR}/ui/ui.c"
-    "${SHARED_MAIN_DIR}/assets/splash_img.c"
+    "${SHARED_MAIN_DIR}/assets/splash_480x320_img.c"
+    "${SHARED_MAIN_DIR}/assets/splash_240x135_img.c"
     "${SHARED_MAIN_DIR}/assets/logo_img.c"
     "${SHARED_MAIN_DIR}/ui/word_entry.c"
     "${SHARED_MAIN_DIR}/ui/mnemonic_view.c"
