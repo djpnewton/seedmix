@@ -14,6 +14,24 @@
 #define MNEMONIC_VIEW_COLS 4
 #define MNEMONIC_VIEW_ROW_H 30
 
+typedef struct {
+    int32_t* col_dsc;
+    int32_t* row_dsc;
+} mnemonic_view_dscs_t;
+
+static void mnemonic_view_dscs_free(lv_obj_t* view) {
+    mnemonic_view_dscs_t* d = (mnemonic_view_dscs_t*)lv_obj_get_user_data(view);
+    if (!d) return;
+    if (d->col_dsc) lv_free(d->col_dsc);
+    if (d->row_dsc) lv_free(d->row_dsc);
+    lv_free(d);
+    lv_obj_set_user_data(view, NULL);
+}
+
+static void mnemonic_view_delete_cb(lv_event_t* e) {
+    mnemonic_view_dscs_free(lv_event_get_target(e));
+}
+
 /* -- Public API ------------------------------------------------------- */
 lv_obj_t* ui_mnemonic_view_create(lv_obj_t* parent) {
     ASSERT_OR_DIE(parent, "null parent");
@@ -26,6 +44,7 @@ lv_obj_t* ui_mnemonic_view_create(lv_obj_t* parent) {
     lv_obj_set_style_pad_row(view, 2, 0);
     lv_obj_set_style_pad_column(view, 2, 0);
     lv_obj_clear_flag(view, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(view, mnemonic_view_delete_cb, LV_EVENT_DELETE, NULL);
     return view;
 }
 
@@ -55,14 +74,27 @@ void ui_mnemonic_view_set_words(lv_obj_t* view, const char* words) {
     unsigned rows = (unsigned)((count + cols - 1) / cols);
 
     /* Grid template: equal-width columns, fixed-height rows. */
-    int32_t col_dsc[MNEMONIC_VIEW_COLS + 1];
-    int32_t row_dsc[7]; /* up to 6 rows (24 words / 4 cols) + terminator */
-    for (unsigned c = 0; c < cols; c++) col_dsc[c] = LV_GRID_FR(1);
-    col_dsc[cols] = LV_GRID_TEMPLATE_LAST;
-    for (unsigned r = 0; r < rows; r++) row_dsc[r] = ui_scale(MNEMONIC_VIEW_ROW_H);
-    row_dsc[rows] = LV_GRID_TEMPLATE_LAST;
+    mnemonic_view_dscs_t* d = (mnemonic_view_dscs_t*)lv_obj_get_user_data(view);
+    if (!d) {
+        d = lv_malloc(sizeof(*d));
+        ASSERT_OR_DIE(d, "mnemonic grid descriptor ctx alloc");
+        d->col_dsc = NULL;
+        d->row_dsc = NULL;
+        lv_obj_set_user_data(view, d);
+    }
+    if (d->col_dsc) lv_free(d->col_dsc);
+    if (d->row_dsc) lv_free(d->row_dsc);
 
-    lv_obj_set_grid_dsc_array(view, col_dsc, row_dsc);
+    d->col_dsc = lv_malloc(sizeof(int32_t) * (cols + 1));
+    d->row_dsc = lv_malloc(sizeof(int32_t) * (rows + 1));
+    ASSERT_OR_DIE(d->col_dsc && d->row_dsc, "mnemonic grid descriptor alloc");
+
+    for (unsigned c = 0; c < cols; c++) d->col_dsc[c] = LV_GRID_FR(1);
+    d->col_dsc[cols] = LV_GRID_TEMPLATE_LAST;
+    for (unsigned r = 0; r < rows; r++) d->row_dsc[r] = ui_scale(MNEMONIC_VIEW_ROW_H);
+    d->row_dsc[rows] = LV_GRID_TEMPLATE_LAST;
+
+    lv_obj_set_grid_dsc_array(view, d->col_dsc, d->row_dsc);
 
     for (size_t i = 0; i < count; i++) {
         unsigned col = (unsigned)(i % cols);
