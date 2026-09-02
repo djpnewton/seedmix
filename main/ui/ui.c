@@ -17,6 +17,9 @@
 
 #ifndef ESP_PLATFORM
 #include <SDL2/SDL.h>
+#else
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #endif
 
 /* -- Helpers ---------------------------------------------------------- */
@@ -801,7 +804,10 @@ void ui_delay_ms(uint32_t ms) {
         // should only be called from the main thread (which could be a UI callback i tihnk)
         lv_timer_handler();
 #ifdef ESP_PLATFORM
-        vTaskDelay(pdMS_TO_TICKS(5));
+        /* Yield at least one FreeRTOS tick so the idle tasks get to run.
+         * At the default 100 Hz tick rate pdMS_TO_TICKS(5) rounds to 0 ticks,
+         * which busy-spins and trips the task watchdog. */
+        vTaskDelay(pdMS_TO_TICKS(10));
 #else
         SDL_Delay(5);
 #endif
