@@ -36,7 +36,7 @@ jobs:
         run: bash scripts/build.sh ${{ matrix.build }}
 
       - name: Verify binary exists
-        run: test -x build/seedmix
+        run: test -x build_linux/seedmix
 
   esp32:
     runs-on: ubuntu-22.04
@@ -58,3 +58,38 @@ jobs:
 
       - name: Verify firmware exists
         run: test -f platform/esp32/build/seedmix.bin
+
+  web:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache Emscripten SDK
+        uses: actions/cache@v4
+        with:
+          path: external/emsdk
+          key: emsdk-${{ hashFiles('scripts/ensure_deps.sh') }}-${{ runner.os }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libtool-bin
+
+      - name: Build (Emscripten)
+        run: bash scripts/build_web.sh
+
+      - name: Verify output exists
+        run: |
+          test -f build_web/seedmix.html
+          test -f build_web/seedmix.js
+          test -f build_web/seedmix.wasm
