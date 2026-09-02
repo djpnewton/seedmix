@@ -3,7 +3,9 @@
  * @brief Translation layer: physical buttons -> logical LVGL keys.
  *
  * The hardware layer (buttons.c) only reports raw button state.  This layer
- * debounces it and maps combinations to logical LVGL navigation keys:
+ * debounces each button, then debounces the button combination so a slightly
+ * staggered two-button press still registers as ENTER, and maps combinations
+ * to logical LVGL navigation keys:
  *
  *   button 0 alone       -> LV_KEY_PREV  (previous focusable item)
  *   button 1 alone       -> LV_KEY_NEXT  (next focusable item)
@@ -47,21 +49,95 @@ static bool debounced_pressed(int idx) {
     return d->state;
 }
 
+/* -- Two-stage debounce ------------------------------------------------
+ * Each button is debounced individually (debounced_pressed), then the button
+ * combination is debounced again so a slightly staggered two-button press is
+ * recognised as ENTER instead of firing a stray PREV/NEXT first.
+ *
+ *   IDLE    -> ARMING  when one button goes down (start the combo window)
+ *   ARMING  -> ENTER   when the second button joins within the window
+ *   ARMING  -> SINGLE  when the window elapses with still one button
+ *   SINGLE  -> ENTER   when the second button joins later
+ *   ENTER   -> IDLE    only when every button is released (latched)
+ */
+typedef enum {
+    KEYMAP_STATE_IDLE = 0,
+    KEYMAP_STATE_ARMING,
+    KEYMAP_STATE_SINGLE,
+    KEYMAP_STATE_ENTER,
+} keymap_state_t;
+
+static keymap_state_t s_state     = KEYMAP_STATE_IDLE;
+static lv_key_t       s_arm_key   = 0;
+static uint32_t       s_arm_since = 0;
+
 /* Map the current button combination to a single logical key (0 = none). */
 static lv_key_t translate(void) {
-    bool b0 = debounced_pressed(0);
-    bool b1 = debounced_pressed(1);
+    bool     b0  = debounced_pressed(0);
+    bool     b1  = debounced_pressed(1);
+    uint32_t now = lv_tick_get();
 
-    if (b0 && b1) {
+    switch (s_state) {
+    case KEYMAP_STATE_IDLE:
+        if (b0 && b1) {
+            s_state = KEYMAP_STATE_ENTER;
+            return LV_KEY_ENTER;
+        }
+        if (b0 || b1) {
+            s_state     = KEYMAP_STATE_ARMING;
+            s_arm_key   = b0 ? LV_KEY_PREV : LV_KEY_NEXT;
+            s_arm_since = now;
+        }
+        return 0;
+
+    case KEYMAP_STATE_ARMING:
+        if (b0 && b1) {
+            s_state = KEYMAP_STATE_ENTER;
+            return LV_KEY_ENTER;
+        }
+        if (!b0 && !b1) {
+            s_state = KEYMAP_STATE_IDLE;
+            return 0;
+        }
+        {
+            lv_key_t key = b0 ? LV_KEY_PREV : LV_KEY_NEXT;
+            if (key != s_arm_key) {
+                /* A different single button went down - re-arm. */
+                s_arm_key   = key;
+                s_arm_since = now;
+                return 0;
+            }
+            if ((now - s_arm_since) >= (uint32_t)CONFIG_SEEDMIX_BUTTONS_COMBO_MS) {
+                s_state = KEYMAP_STATE_SINGLE;
+                return s_arm_key;
+            }
+        }
+        return 0;
+
+    case KEYMAP_STATE_SINGLE:
+        if (b0 && b1) {
+            s_state = KEYMAP_STATE_ENTER;
+            return LV_KEY_ENTER;
+        }
+        if (!b0 && !b1) {
+            s_state = KEYMAP_STATE_IDLE;
+            return 0;
+        }
+        return (b0 ? LV_KEY_PREV : LV_KEY_NEXT);
+
+    case KEYMAP_STATE_ENTER:
+        /* Latch ENTER until all buttons are released so an early release of
+         * one button cannot produce a stray PREV/NEXT afterwards. */
+        if (!b0 && !b1) {
+            s_state = KEYMAP_STATE_IDLE;
+            return 0;
+        }
         return LV_KEY_ENTER;
+
+    default:
+        s_state = KEYMAP_STATE_IDLE;
+        return 0;
     }
-    if (b0) {
-        return LV_KEY_PREV;
-    }
-    if (b1) {
-        return LV_KEY_NEXT;
-    }
-    return 0;
 }
 
 static void keymap_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {

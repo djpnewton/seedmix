@@ -5,6 +5,9 @@
  *   button 0 alone       -> LV_KEY_PREV  (previous focusable item)
  *   button 1 alone       -> LV_KEY_NEXT  (next focusable item)
  *   button 0 + button 1  -> LV_KEY_ENTER (confirm / activate)
+ *
+ * A single-button key is only committed after a short combo window so a
+ * slightly staggered two-button press is still recognised as ENTER.
  */
 
 #ifndef SEEDMIX_ESP32_KEYMAP_H

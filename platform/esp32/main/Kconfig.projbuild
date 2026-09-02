@@ -304,6 +304,18 @@ menu "seedmix Hardware"
             default 30
             range 5 200
             depends on SEEDMIX_BUTTONS_ENABLE
+
+        config SEEDMIX_BUTTONS_COMBO_MS
+            int "Two-button combo window (ms)"
+            default 60
+            range 10 300
+            depends on SEEDMIX_BUTTONS_ENABLE
+            help
+                After one button is pressed, how long to wait for the second
+                button before committing the single-button key (PREV/NEXT).
+                If both buttons are pressed within this window, an ENTER is
+                emitted instead, so slightly staggered presses still register
+                as "both buttons = confirm".
     endmenu
 
     # ------------------------------------------------------------------
