@@ -115,6 +115,16 @@ void hal_camera_close(hal_camera_t* cam);
  */
 void hal_camera_frame_free(hal_camera_frame_t* frame);
 
+/**
+ * @brief Check whether touch/pointer input is available for touch entropy.
+ *
+ * The touch entropy source needs a pointer input device (e.g. an SDL mouse
+ * on Linux, or a wired-up touchscreen on embedded targets).
+ *
+ * @return true if a touchscreen/pointer input device is available.
+ */
+bool hal_touch_available(void);
+
 #ifdef __cplusplus
 }
 #endif
